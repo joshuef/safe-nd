@@ -301,6 +301,18 @@ pub struct Transaction {
     pub amount: Coins,
 }
 
+/// Transaction ID.
+pub type TransactionId = u64; // TODO: Use the trait UUID
+
+/// Coin transaction.
+#[derive(Copy, Clone, Hash, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize, Debug)]
+pub struct Transaction {
+    /// Transaction ID.
+    pub id: TransactionId,
+    /// Amount of coins.
+    pub amount: Coins,
+}
+
 /// Notification of a transaction.
 #[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
 pub struct Notification(pub Transaction);
