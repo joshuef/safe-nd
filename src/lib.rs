@@ -15,7 +15,7 @@
     test(attr(forbid(warnings)))
 )]
 // For explanation of lint checks, run `rustc -W help`.
-#![forbid(unsafe_code)]
+// #![forbid(unsafe_code)]
 #![warn(
     // TODO: add missing debug implementations for structs?
     // missing_debug_implementations,
@@ -29,15 +29,21 @@
 )]
 
 mod append_only_data;
+mod auth_token;
 mod coins;
 mod errors;
 mod identity;
 mod immutable_data;
+mod ipc_errors;
 mod keys;
 mod mutable_data;
 mod request;
 mod response;
+mod safe_key;
 mod utils;
+
+pub use ipc_errors::IpcError;
+pub use safe_key::SafeKey;
 
 pub use append_only_data::{
     Action as ADataAction, Address as ADataAddress, AppendOnlyData,
@@ -77,6 +83,8 @@ pub use response::{Response, TryFromError};
 pub use sha3::Sha3_512 as Ed25519Digest;
 pub use utils::verify_signature;
 
+pub use auth_token::{AuthToken, Caveat};
+
 use hex_fmt::HexFmt;
 use multibase::Decodable;
 use rand::{
@@ -88,6 +96,32 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
     net::SocketAddr,
 };
+
+/// Any FullId, App or Client
+pub enum FullId {
+    /// ClientFullId
+    Client(ClientFullId),
+    /// AppFullId
+    App(AppFullId),
+}
+
+impl FullId {
+    /// Sign a message, to be later validated by PublicId
+    pub fn sign<T: AsRef<[u8]>>(&self, data: T) -> Signature {
+        match self {
+            FullId::Client(full_id) => full_id.sign(data),
+            FullId::App(full_id) => full_id.sign(data),
+        }
+    }
+
+    /// Retrieve the associated PublicId.
+    pub fn public_id(&self) -> PublicId {
+        match self {
+            FullId::Client(full_id) => PublicId::Client(full_id.public_id().clone()),
+            FullId::App(full_id) => PublicId::App(full_id.public_id().clone()),
+        }
+    }
+}
 
 /// Object storing a data variant.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
@@ -205,6 +239,8 @@ pub enum Message {
         message_id: MessageId,
         /// Signature of `(request, message_id)`. Optional if the request is read-only.
         signature: Option<Signature>,
+        /// Authentication token. Required for permissioned operations.
+        token: Option<AuthToken>,
     },
     /// Response matched to the message ID.
     Response {
@@ -278,18 +314,6 @@ pub enum HandshakeResponse {
     Challenge(PublicId, Vec<u8>),
     /// Sent by nodes as a response to an invalid `HandshakeRequest::Join` (when a client attempts to join a wrong section).
     InvalidSection,
-}
-
-/// Transaction ID.
-pub type TransactionId = u64; // TODO: Use the trait UUID
-
-/// Coin transaction.
-#[derive(Copy, Clone, Hash, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize, Debug)]
-pub struct Transaction {
-    /// Transaction ID.
-    pub id: TransactionId,
-    /// Amount of coins.
-    pub amount: Coins,
 }
 
 /// Transaction ID.
