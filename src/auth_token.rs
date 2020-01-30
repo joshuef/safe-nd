@@ -52,12 +52,9 @@ impl AuthToken {
 
     /// Insantiate new token
     pub fn new() -> Result<AuthToken, String> {
-        let token = AuthToken::default();
-
-        Ok(token)
+        Ok(AuthToken::default())
     }
     /// Add a caveat to the token. This will update the token's signature.
-    // TODO: Make this more generic? Can we just pass a sign func?
     pub fn add_caveat(&mut self, caveat: Caveat, full_id: &FullId) -> Result<(), String> {
         self.caveats.push(caveat);
         self.sign(&full_id)?;
@@ -66,18 +63,13 @@ impl AuthToken {
     }
     /// Sign the token
     fn sign(&mut self, full_id: &FullId) -> Result<(), String> {
-        // clear any signature first.
-        self.signature = None;
+        let serialized_caveats = serde_json::to_string(&self.caveats).unwrap();
 
-        let serialized_token = serde_json::to_string(&self).unwrap();
-        let sig = full_id.sign(&serialized_token.into_bytes());
-
-        assert_eq!(&sig, &sig);
-
-        self.signature = Some(sig);
+        self.signature = Some(full_id.sign(&serialized_caveats.into_bytes()));
 
         Ok(())
     }
+
     // TODO: do we actually need this?
     /// serialize the token to json
     pub fn serialize(&self) -> Result<Vec<u8>, String> {
@@ -90,18 +82,13 @@ impl AuthToken {
         Ok(token)
     }
     /// Check if the token signature is valid for a given public key
-    pub fn is_valid_for_public_id(&mut self, public_id: &PublicId) -> bool {
-        let mut token_to_sign = self.clone();
-
+    pub fn is_valid_for_public_id(&self, public_id: &PublicId) -> bool {
         let public_key = public_id.public_key();
-        //clear signature for checks
-        token_to_sign.signature = None;
-        let serialised_token = serde_json::to_string(&token_to_sign).unwrap();
-        let raw_sig = self.signature.as_ref().unwrap();
+        let serialised_caveats = serde_json::to_string(&self.caveats).unwrap();
 
-        let sig: Signature = raw_sig.clone();
+        let sig = &self.signature.clone().unwrap();
 
-        match public_key.verify(&sig, &serialised_token) {
+        match public_key.verify(sig, &serialised_caveats) {
             Ok(()) => true,
             Err(_) => false,
         }
