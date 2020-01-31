@@ -96,6 +96,8 @@ pub enum Error {
     BalanceExists,
     /// Expected data size exceeded.
     ExceededSize,
+    /// Could not serliaise token caveats
+    InvalidCaveats(String),
 }
 
 impl<T: Into<String>> From<T> for Error {
@@ -154,6 +156,9 @@ impl Display for Error {
             Error::BalanceExists => write!(f, "Balance already exists"),
             Error::DuplicateMessageId => write!(f, "MessageId already exists"),
             Error::ExceededSize => write!(f, "Size of the structure exceeds the limit"),
+            Error::InvalidCaveats(ref error) => {
+                write!(f, "Caveats could not be serialised: {}", error)
+            }
         }
     }
 }
@@ -191,6 +196,7 @@ impl error::Error for Error {
             Error::BalanceExists => "Balance already exists",
             Error::DuplicateMessageId => "MessageId already exists",
             Error::ExceededSize => "Exceeded the size limit",
+            Error::InvalidCaveats(ref error) => error,
         }
     }
 }
