@@ -11,8 +11,9 @@
 //! App authentication token generation
 
 use crate::IpcError;
+use crate::errors::{Error, Result as NdResult};
 use crate::{FullId, PublicId, Signature};
-use bincode::{deserialize, serialize};
+use bincode::serialize;
 use ffi_utils::ReprC;
 
 use serde::{Deserialize, Serialize};
@@ -51,51 +52,41 @@ impl AuthToken {
     pub const VERSION: usize = 1;
 
     /// Insantiate new token
-    pub fn new() -> Result<AuthToken, String> {
+    pub fn new() -> NdResult<AuthToken> {
         Ok(AuthToken::default())
     }
     /// Add a caveat to the token. This will update the token's signature.
-    pub fn add_caveat(&mut self, caveat: Caveat, full_id: &FullId) -> Result<(), String> {
+    pub fn add_caveat(&mut self, caveat: Caveat, full_id: &FullId) -> NdResult<()> {
         self.caveats.push(caveat);
         self.sign(&full_id)?;
 
         Ok(())
     }
     /// Sign the token
-    fn sign(&mut self, full_id: &FullId) -> Result<(), String> {
-        let serialized_caveats = serde_json::to_string(&self.caveats).unwrap();
+    fn sign(&mut self, full_id: &FullId) -> NdResult<()> {
+        let serialized_caveats = serialize(&self.caveats).unwrap();
 
-        self.signature = Some(full_id.sign(&serialized_caveats.into_bytes()));
+        self.signature = Some(full_id.sign(&serialized_caveats));
 
         Ok(())
     }
 
-    // TODO: do we actually need this?
-    /// serialize the token to json
-    pub fn serialize(&self) -> Result<Vec<u8>, String> {
-        let token = serialize(&self).unwrap();
-        Ok(token)
-    }
-    /// Deserialize the token from a json string
-    pub fn deserialize(cereal: &[u8]) -> Result<AuthToken, String> {
-        let token: AuthToken = deserialize(cereal).unwrap();
-        Ok(token)
-    }
     /// Check if the token signature is valid for a given public key
-    pub fn is_valid_for_public_id(&self, public_id: &PublicId) -> bool {
+    pub fn is_valid_for_public_id(&self, public_id: &PublicId) -> NdResult<bool> {
         let public_key = public_id.public_key();
-        let serialised_caveats = serde_json::to_string(&self.caveats).unwrap();
+        let serialised_caveats =
+            serialize(&self.caveats).map_err(|e| Error::InvalidCaveats(e.to_string()))?;
 
         let sig = &self.signature.clone().unwrap();
 
-        match public_key.verify(sig, &serialised_caveats) {
-            Ok(()) => true,
-            Err(_) => false,
+        match public_key.verify(&sig, &serialised_caveats) {
+            Ok(()) => Ok(true),
+            Err(_) => Ok(false),
         }
     }
 
     /// Constructs FFI wrapper for the native Rust object, consuming self.
-    pub fn into_repr_c(self) -> Result<AuthToken, IpcError> {
+    pub fn into_repr_c(self) -> NdResult<AuthToken> {
         let Self {
             caveats,
             version,
@@ -127,6 +118,7 @@ impl ReprC for AuthToken {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bincode::deserialize;
     use rand::thread_rng;
 
     use crate::{AppFullId, ClientFullId};
@@ -186,10 +178,10 @@ mod tests {
 
         token.add_caveat(caveat, &full_id).unwrap();
 
-        let cereal = &token.serialize().unwrap();
-        let mut rehydrate = AuthToken::deserialize(&cereal).unwrap();
+        let cereal = serialize(&token).unwrap();
+        let rehydrate: AuthToken = deserialize(&cereal).unwrap();
 
-        assert!(rehydrate.is_valid_for_public_id(&public_id));
+        assert!(rehydrate.is_valid_for_public_id(&public_id).unwrap());
     }
 
     #[test]
@@ -205,12 +197,12 @@ mod tests {
 
         token.add_caveat(caveat, &full_id).unwrap();
 
-        let cereal = &token.serialize().unwrap();
-        let mut rehydrate = AuthToken::deserialize(&cereal).unwrap();
+        let cereal = serialize(&token).unwrap();
+        let rehydrate: AuthToken = deserialize(&cereal).unwrap();
         let new_client_id = generate_safe_key();
         let public_id2 = new_client_id.public_id();
 
-        assert!(!rehydrate.is_valid_for_public_id(&public_id2));
+        assert!(!rehydrate.is_valid_for_public_id(&public_id2).unwrap());
     }
 
     #[test]
@@ -228,13 +220,13 @@ mod tests {
 
         token.add_caveat(caveat, &full_id).unwrap();
 
-        let cereal = &token.serialize().unwrap();
+        let cereal = serialize(&token).unwrap();
 
-        let mut rehydrate = AuthToken::deserialize(&cereal).unwrap();
+        let mut rehydrate: AuthToken = deserialize(&cereal).unwrap();
         let new_client_id = generate_safe_key();
 
         // Original token is valid
-        assert!(rehydrate.is_valid_for_public_id(&public_id));
+        assert!(rehydrate.is_valid_for_public_id(&public_id).unwrap());
 
         // trying to add a new caveat
         let caveat3 = ("expir3".to_string(), "nowthen222".to_string());
@@ -243,7 +235,7 @@ mod tests {
         rehydrate.add_caveat(caveat3, &new_client_id).unwrap();
 
         // check against original app key fails...
-        let should_not_be_valid = rehydrate.is_valid_for_public_id(&public_id);
+        let should_not_be_valid = rehydrate.is_valid_for_public_id(&public_id).unwrap();
         assert!(!should_not_be_valid);
     }
 
@@ -262,15 +254,15 @@ mod tests {
 
         token.add_caveat(caveat, &full_id).unwrap();
 
-        let cereal = &token.serialize().unwrap();
+        let cereal = serialize(&token).unwrap();
 
-        let mut rehydrate = AuthToken::deserialize(&cereal).unwrap();
+        let mut rehydrate: AuthToken = deserialize(&cereal).unwrap();
 
         // Original token is valid
-        assert!(rehydrate.is_valid_for_public_id(&public_id));
+        assert!(rehydrate.is_valid_for_public_id(&public_id).unwrap());
 
-        // modifying caveats fails sig
+        // modifying caveats .unwrap()fails sig
         let _ = rehydrate.caveats.drain(0..1);
-        assert!(!rehydrate.is_valid_for_public_id(&public_id));
+        assert!(!rehydrate.is_valid_for_public_id(&public_id).unwrap());
     }
 }
