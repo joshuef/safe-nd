@@ -10,8 +10,8 @@
 
 //! App authentication token generation
 
-use crate::IpcError;
 use crate::errors::{Error, Result as NdResult};
+use crate::IpcError;
 use crate::{FullId, PublicId, Signature};
 use bincode::serialize;
 use ffi_utils::ReprC;
@@ -19,7 +19,7 @@ use ffi_utils::ReprC;
 use serde::{Deserialize, Serialize};
 
 pub type CaveatName = String;
-pub type CaveatContents = String; //| LabelCaveatContents;
+pub type CaveatContents = String;
 
 /// Caveat to be optionally validate as a condition on the token
 pub type Caveat = (CaveatName, CaveatContents);
@@ -83,6 +83,30 @@ impl AuthToken {
             Ok(()) => Ok(true),
             Err(_) => Ok(false),
         }
+    }
+
+    fn get_caveat_by_name(&self, target_caveat: &CaveatName) -> Option<&Caveat> {
+        self.caveats
+            .iter()
+            .find(|(caveat_name, _caveat_contents)| caveat_name == target_caveat)
+    }
+
+    /// Pass a function to check against the token. If a caveat to be checked doesn't exist,
+    /// verification fails and 'false' is returned.
+    pub fn verify_caveat(
+        &self,
+        caveat: &CaveatName,
+        checker: fn(CaveatContents) -> bool,
+    ) -> NdResult<bool> {
+        // Check caveat w/ name exists....
+        let (_caveat_name, caveat_contents) = match &self.get_caveat_by_name(caveat) {
+            Some(target_caveat) => target_caveat,
+            None => return Ok(false), // Or should we error here?
+        };
+
+        // run against supplied checker...
+        let validity = checker(caveat_contents.clone());
+        Ok(validity)
     }
 
     /// Constructs FFI wrapper for the native Rust object, consuming self.
@@ -182,6 +206,101 @@ mod tests {
         let rehydrate: AuthToken = deserialize(&cereal).unwrap();
 
         assert!(rehydrate.is_valid_for_public_id(&public_id).unwrap());
+    }
+
+    #[test]
+    fn create_token_re_serialize_and_check_validity_with_valid_checker() {
+        let full_id = generate_safe_key();
+        let public_id = full_id.public_id();
+
+        let mut token = AuthToken::new().unwrap();
+
+        // no caveat added, no signature added
+        let caveat_len = token.clone().caveats.len();
+        assert_eq!(caveat_len, 0);
+
+        let expire = "expire".to_string();
+
+        let caveat = (expire.clone(), "nowthen".to_string());
+
+        token.add_caveat(caveat, &full_id).unwrap();
+
+        let cereal = serialize(&token).unwrap();
+        let rehydrate: AuthToken = deserialize(&cereal).unwrap();
+
+        fn valid_checker(contents: CaveatContents) -> bool {
+            contents == "nowthen".to_string()
+        }
+
+        // sig validity
+        assert!(rehydrate.is_valid_for_public_id(&public_id).unwrap());
+
+        // pass
+        assert!(rehydrate.verify_caveat(&expire, valid_checker).unwrap());
+    }
+
+    #[test]
+    fn create_token_re_serialize_and_check_validity_with_invalid_checker() {
+        let full_id = generate_safe_key();
+        let public_id = full_id.public_id();
+
+        let mut token = AuthToken::new().unwrap();
+
+        // no caveat added, no signature added
+        let caveat_len = token.clone().caveats.len();
+        assert_eq!(caveat_len, 0);
+
+        let expire = "expire".to_string();
+
+        let caveat = (expire.clone(), "nowthen".to_string());
+
+        token.add_caveat(caveat, &full_id).unwrap();
+
+        let cereal = serialize(&token).unwrap();
+        let rehydrate: AuthToken = deserialize(&cereal).unwrap();
+
+        fn invalid_checker(contents: CaveatContents) -> bool {
+            contents == "never surrender".to_string()
+        }
+
+        // sig validity
+        assert!(rehydrate.is_valid_for_public_id(&public_id).unwrap());
+
+        // fail
+        assert!(!rehydrate.verify_caveat(&expire, invalid_checker).unwrap());
+    }
+
+    #[test]
+    fn create_token_re_serialize_and_try_to_check_nonexistant_caveat() {
+        let full_id = generate_safe_key();
+        let public_id = full_id.public_id();
+
+        let mut token = AuthToken::new().unwrap();
+
+        // no caveat added, no signature added
+        let caveat_len = token.clone().caveats.len();
+        assert_eq!(caveat_len, 0);
+
+        let expire = "expire".to_string();
+
+        let caveat = (expire.clone(), "nowthen".to_string());
+
+        token.add_caveat(caveat, &full_id).unwrap();
+
+        let cereal = serialize(&token).unwrap();
+        let rehydrate: AuthToken = deserialize(&cereal).unwrap();
+
+        fn valid_checker(contents: CaveatContents) -> bool {
+            contents == "nowthen".to_string()
+        }
+
+        // sig validity
+        assert!(rehydrate.is_valid_for_public_id(&public_id).unwrap());
+
+        // fail
+        assert!(!rehydrate
+            .verify_caveat(&"non_existant_caveat".to_string(), valid_checker)
+            .unwrap());
     }
 
     #[test]
