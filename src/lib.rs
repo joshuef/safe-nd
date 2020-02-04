@@ -168,6 +168,10 @@ impl From<AData> for Data {
     }
 }
 
+pub const TRANSFER_COINS : &str = "transfer_coins";
+pub const PERFORM_MUTATIONS : &str = "perform_mutations";
+pub const GET_BALANCE : &str = "get_balance";
+
 /// Permissions for an app stored by the Client Handlers.
 #[derive(
     Copy, Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize, Default, Debug,
