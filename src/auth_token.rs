@@ -111,7 +111,7 @@ impl AuthToken {
     }
 
     /// Constructs FFI wrapper for the native Rust object, consuming self.
-    pub fn into_repr_c(self) -> NdResult<AuthToken> {
+    pub fn into_repr_c(self) ->  Result<AuthToken, String> {
         let Self {
             caveats,
             version,
@@ -304,7 +304,7 @@ mod tests {
     }
 
     #[test]
-    fn token_check_against_naother_app_fails() {
+    fn token_check_against_another_app_fails() {
         let full_id = generate_safe_key();
         let mut token = unwrap!(AuthToken::new());
 
