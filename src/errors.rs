@@ -98,6 +98,8 @@ pub enum Error {
     ExceededSize,
     /// Could not serliaise token caveats
     InvalidCaveats(String),
+    /// Could validate the token
+    InvalidToken,
 }
 
 impl<T: Into<String>> From<T> for Error {
@@ -158,7 +160,8 @@ impl Display for Error {
             Error::ExceededSize => write!(f, "Size of the structure exceeds the limit"),
             Error::InvalidCaveats(ref error) => {
                 write!(f, "Caveats could not be serialised: {}", error)
-            }
+            },
+            Error::InvalidToken => write!(f, "Unable to validate the authentication token"),
         }
     }
 }
@@ -197,6 +200,7 @@ impl error::Error for Error {
             Error::DuplicateMessageId => "MessageId already exists",
             Error::ExceededSize => "Exceeded the size limit",
             Error::InvalidCaveats(ref error) => error,
+            Error::InvalidToken => "Token not valid",
         }
     }
 }
