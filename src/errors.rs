@@ -160,7 +160,7 @@ impl Display for Error {
             Error::ExceededSize => write!(f, "Size of the structure exceeds the limit"),
             Error::InvalidCaveats(ref error) => {
                 write!(f, "Caveats could not be serialised: {}", error)
-            },
+            }
             Error::InvalidToken => write!(f, "Unable to validate the authentication token"),
         }
     }

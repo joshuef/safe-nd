@@ -168,9 +168,12 @@ impl From<AData> for Data {
     }
 }
 
-pub const TRANSFER_COINS : &str = "transfer_coins";
-pub const PERFORM_MUTATIONS : &str = "perform_mutations";
-pub const GET_BALANCE : &str = "get_balance";
+/// Can transfer coins
+pub const TRANSFER_COINS: &str = "transfer_coins";
+/// Can perform mutations
+pub const PERFORM_MUTATIONS: &str = "perform_mutations";
+/// Can get a SafeKey's balance
+pub const GET_BALANCE: &str = "get_balance";
 
 /// Permissions for an app stored by the Client Handlers.
 #[derive(
