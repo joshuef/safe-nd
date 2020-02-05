@@ -12,7 +12,7 @@
 
 use crate::errors::{Error, Result as NdResult};
 use crate::IpcError;
-use crate::{PublicId, SafeKey, Signature};
+use crate::{PublicKey, SafeKey, Signature};
 use bincode::serialize;
 use ffi_utils::ReprC;
 
@@ -27,7 +27,7 @@ pub type Caveat = (CaveatName, CaveatContents);
 /// Authentication Token, to be passed as means of authorisation to an app.
 // To have signature of contents checked against the PublicKey in the account as validation.
 #[repr(C)]
-#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, Ord, PartialEq, PartialOrd, Eq)]
 pub struct AuthToken {
     /// Auth token version
     pub version: usize,
@@ -73,8 +73,7 @@ impl AuthToken {
     }
 
     /// Check if the token signature is valid for a given public key
-    pub fn is_valid_for_public_id(&self, public_id: &PublicId) -> NdResult<bool> {
-        let public_key = public_id.public_key();
+    pub fn is_valid_for_public_key(&self, public_key: &PublicKey) -> NdResult<bool> {
         let serialised_caveats =
             serialize(&self.caveats).map_err(|e| Error::InvalidCaveats(e.to_string()))?;
 
@@ -111,7 +110,7 @@ impl AuthToken {
     }
 
     /// Constructs FFI wrapper for the native Rust object, consuming self.
-    pub fn into_repr_c(self) ->  Result<AuthToken, String> {
+    pub fn into_repr_c(self) -> Result<AuthToken, String> {
         let Self {
             caveats,
             version,
@@ -204,7 +203,9 @@ mod tests {
         let cereal = unwrap!(serialize(&token));
         let rehydrate: AuthToken = unwrap!(deserialize(&cereal));
 
-        assert!(unwrap!(rehydrate.is_valid_for_public_id(&public_id)));
+        assert!(unwrap!(
+            rehydrate.is_valid_for_public_key(&public_id.public_key())
+        ));
     }
 
     #[test]
@@ -232,7 +233,9 @@ mod tests {
         }
 
         // sig validity
-        assert!(unwrap!(rehydrate.is_valid_for_public_id(&public_id)));
+        assert!(unwrap!(
+            rehydrate.is_valid_for_public_key(&public_id.public_key())
+        ));
 
         // pass
         assert!(unwrap!(rehydrate.verify_caveat(&expire, valid_checker)));
@@ -263,7 +266,9 @@ mod tests {
         }
 
         // sig validity
-        assert!(unwrap!(rehydrate.is_valid_for_public_id(&public_id)));
+        assert!(unwrap!(
+            rehydrate.is_valid_for_public_key(&public_id.public_key())
+        ));
 
         // fail
         assert!(!unwrap!(rehydrate.verify_caveat(&expire, invalid_checker)));
@@ -294,7 +299,9 @@ mod tests {
         }
 
         // sig validity
-        assert!(unwrap!(rehydrate.is_valid_for_public_id(&public_id)));
+        assert!(unwrap!(
+            rehydrate.is_valid_for_public_key(&public_id.public_key())
+        ));
 
         // fail
         assert!(!unwrap!(rehydrate.verify_caveat(
@@ -321,7 +328,9 @@ mod tests {
         let new_client_id = generate_safe_key();
         let public_id2 = new_client_id.public_id();
 
-        assert!(!unwrap!(rehydrate.is_valid_for_public_id(&public_id2)));
+        assert!(!unwrap!(
+            rehydrate.is_valid_for_public_key(&public_id2.public_key())
+        ));
     }
 
     #[test]
@@ -345,7 +354,9 @@ mod tests {
         let new_client_id = generate_safe_key();
 
         // Original token is valid
-        assert!(unwrap!(rehydrate.is_valid_for_public_id(&public_id)));
+        assert!(unwrap!(
+            rehydrate.is_valid_for_public_key(&public_id.public_key())
+        ));
 
         // trying to add a new caveat
         let caveat3 = ("expir3".to_string(), "nowthen222".to_string());
@@ -354,7 +365,8 @@ mod tests {
         unwrap!(rehydrate.add_caveat(caveat3, &new_client_id));
 
         // check against original app key fails...
-        let should_not_be_valid = unwrap!(rehydrate.is_valid_for_public_id(&public_id));
+        let should_not_be_valid =
+            unwrap!(rehydrate.is_valid_for_public_key(&public_id.public_key()));
         assert!(!should_not_be_valid);
     }
 
@@ -378,10 +390,14 @@ mod tests {
         let mut rehydrate: AuthToken = unwrap!(deserialize(&cereal));
 
         // Original token is valid
-        assert!(unwrap!(rehydrate.is_valid_for_public_id(&public_id)));
+        assert!(unwrap!(
+            rehydrate.is_valid_for_public_key(&public_id.public_key())
+        ));
 
         // modifying caveats .unwrap()fails sig
         let _ = rehydrate.caveats.drain(0..1);
-        assert!(!unwrap!(rehydrate.is_valid_for_public_id(&public_id)));
+        assert!(!unwrap!(
+            rehydrate.is_valid_for_public_key(&public_id.public_key())
+        ));
     }
 }
