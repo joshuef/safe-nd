@@ -35,8 +35,8 @@ impl<'a, T> Debug for ErrorDebug<'a, T> {
 /// Main error type for the crate.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Error {
-    /// Access is denied for a given requester
-    AccessDenied,
+    /// Access is denied for a given request
+    AccessDenied(String),
     /// Login packet does not exist
     NoSuchLoginPacket,
     /// Attempt to store a login packet at an already occupied address
@@ -73,7 +73,7 @@ pub enum Error {
     /// Mismatch between key type and signature type.
     SigningKeyTypeMismatch,
     /// Failed signature validation.
-    InvalidSignature,
+    InvalidAppSignature,
     /// Received a request with a duplicate MessageId
     DuplicateMessageId,
     /// Network error occurring at Vault level which has no bearing on clients, e.g. serialisation
@@ -96,10 +96,8 @@ pub enum Error {
     BalanceExists,
     /// Expected data size exceeded.
     ExceededSize,
-    /// Could not serliaise token caveats
-    InvalidCaveats(String),
-    /// Could validate the token
-    InvalidToken,
+    /// Token corrupt as failed to serliaise token caveats
+    TokenCorrupt(String),
 }
 
 impl<T: Into<String>> From<T> for Error {
@@ -111,7 +109,7 @@ impl<T: Into<String>> From<T> for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
-            Error::AccessDenied => write!(f, "Access denied"),
+            Error::AccessDenied(ref error) => write!(f, "Access denied: {}", error),
             Error::NoSuchLoginPacket => write!(f, "Login packet does not exist"),
             Error::LoginPacketExists => write!(f, "Login packet already exists at this location"),
             Error::NoSuchData => write!(f, "Requested data not found"),
@@ -140,7 +138,7 @@ impl Display for Error {
             Error::SigningKeyTypeMismatch => {
                 write!(f, "Mismatch between key type and signature type")
             }
-            Error::InvalidSignature => write!(f, "Failed signature validation"),
+            Error::InvalidAppSignature => write!(f, "Failed app signature validation"),
             Error::NetworkOther(ref error) => write!(f, "Error on Vault network: {}", error),
             Error::LossOfPrecision => {
                 write!(f, "Lost precision on the number of coins during parsing")
@@ -158,10 +156,9 @@ impl Display for Error {
             Error::BalanceExists => write!(f, "Balance already exists"),
             Error::DuplicateMessageId => write!(f, "MessageId already exists"),
             Error::ExceededSize => write!(f, "Size of the structure exceeds the limit"),
-            Error::InvalidCaveats(ref error) => {
+            Error::TokenCorrupt(ref error) => {
                 write!(f, "Caveats could not be serialised: {}", error)
             }
-            Error::InvalidToken => write!(f, "Unable to validate the authentication token"),
         }
     }
 }
@@ -169,7 +166,7 @@ impl Display for Error {
 impl error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::AccessDenied => "Access denied",
+            Error::AccessDenied(_) => "Access denied",
             Error::NoSuchLoginPacket => "Login packet does not exist",
             Error::LoginPacketExists => "Login packet already exists at this location",
             Error::NoSuchData => "No such data",
@@ -186,7 +183,7 @@ impl error::Error for Error {
             Error::InvalidPermissionsSuccessor(_) => "Invalid permissions successor",
             Error::InvalidOperation => "Invalid operation",
             Error::SigningKeyTypeMismatch => "Key type and signature type mismatch",
-            Error::InvalidSignature => "Invalid signature",
+            Error::InvalidAppSignature => "Invalid application signature",
             Error::NetworkOther(ref error) => error,
             Error::LossOfPrecision => "Lost precision on the number of coins during parsing",
             Error::ExcessiveValue => {
@@ -199,8 +196,7 @@ impl error::Error for Error {
             Error::BalanceExists => "Balance already exists",
             Error::DuplicateMessageId => "MessageId already exists",
             Error::ExceededSize => "Exceeded the size limit",
-            Error::InvalidCaveats(ref error) => error,
-            Error::InvalidToken => "Token not valid",
+            Error::TokenCorrupt(ref error) => error,
         }
     }
 }
