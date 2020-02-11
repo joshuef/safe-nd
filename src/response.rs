@@ -224,10 +224,11 @@ mod tests {
         let response = Response::Mutation(Ok(()));
         assert_eq!(format!("{:?}", response), "Response::Mutation(Success)");
         use crate::Error;
-        let errored_response = Response::GetADataShell(Err(Error::AccessDenied));
+        let errored_response =
+            Response::GetADataShell(Err(Error::AccessDenied("Permission denied".to_string())));
         assert_eq!(
             format!("{:?}", errored_response),
-            "Response::GetADataShell(AccessDenied)"
+            "Response::GetADataShell(AccessDenied(\"Permission denied\"))"
         );
     }
 
@@ -236,7 +237,7 @@ mod tests {
         use Response::*;
 
         let i_data = IData::Pub(PubImmutableData::new(vec![1, 3, 1, 4]));
-        let e = Error::AccessDenied;
+        let e = Error::AccessDenied("Permission denied".to_string());
         assert_eq!(i_data, unwrap!(GetIData(Ok(i_data.clone())).try_into()));
         assert_eq!(
             TryFromError::Response(e.clone()),

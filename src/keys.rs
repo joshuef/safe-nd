@@ -66,7 +66,7 @@ impl PublicKey {
         }
     }
 
-    /// Returns `Ok(())` if `signature` matches the message and `Err(Error::InvalidSignature)`
+    /// Returns `Ok(())` if `signature` matches the message and `Err(Error::AccessDenied("Invalid signature"))`
     /// otherwise.
     pub fn verify<T: AsRef<[u8]>>(&self, signature: &Signature, data: T) -> Result<()> {
         let is_valid = match (self, signature) {
@@ -80,7 +80,7 @@ impl PublicKey {
         if is_valid {
             Ok(())
         } else {
-            Err(Error::InvalidSignature)
+            Err(Error::AccessDenied("Invalid token isgnature".to_string()))
         }
     }
 

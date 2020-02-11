@@ -256,7 +256,7 @@ macro_rules! impl_mutable_data {
                 if self.owner == requester {
                     Ok(())
                 } else {
-                    Err(Error::AccessDenied)
+                    Err(Error::AccessDenied("Not the owner".to_string()))
                 }
             }
 
@@ -267,13 +267,13 @@ macro_rules! impl_mutable_data {
                 if self.owner == requester {
                     Ok(())
                 } else {
-                    let permissions = self
-                        .user_permissions(requester)
-                        .map_err(|_| Error::AccessDenied)?;
+                    let permissions = self.user_permissions(requester).map_err(|_| {
+                        Error::AccessDenied("Problem accessing permissions".to_string())
+                    })?;
                     if permissions.is_allowed(action) {
                         Ok(())
                     } else {
-                        Err(Error::AccessDenied)
+                        Err(Error::AccessDenied("Permission denied".to_string()))
                     }
                 }
             }
@@ -467,7 +467,7 @@ impl UnseqData {
                 || (!update.is_empty() && !self.is_action_allowed(&requester, Action::Update))
                 || (!delete.is_empty() && !self.is_action_allowed(&requester, Action::Delete)))
         {
-            return Err(Error::AccessDenied);
+            return Err(Error::AccessDenied("Not the owner".to_string()));
         }
 
         let mut new_data = self.data.clone();
@@ -594,7 +594,7 @@ impl SeqData {
                 || (!update.is_empty() && !self.is_action_allowed(&requester, Action::Update))
                 || (!delete.is_empty() && !self.is_action_allowed(&requester, Action::Delete)))
         {
-            return Err(Error::AccessDenied);
+            return Err(Error::AccessDenied("Not the owner".to_string()));
         }
 
         let mut new_data = self.data.clone();
