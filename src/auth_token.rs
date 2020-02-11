@@ -75,7 +75,7 @@ impl AuthToken {
     /// Check if the token signature is valid for a given public key
     pub fn is_valid_for_public_key(&self, public_key: &PublicKey) -> NdResult<bool> {
         let serialised_caveats =
-            serialize(&self.caveats).map_err(|e| Error::InvalidCaveats(e.to_string()))?;
+            serialize(&self.caveats).map_err(|e| Error::TokenCorrupt(e.to_string()))?;
 
         let sig = &self.signature.clone().unwrap();
 

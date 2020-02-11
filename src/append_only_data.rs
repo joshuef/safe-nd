@@ -260,7 +260,7 @@ impl UnpubPermissions {
 }
 
 impl Perm for UnpubPermissions {
-    /// Returns `Ok(())` if `action` is allowed for the provided user and `Err(AccessDenied)` if
+    /// Returns `Ok(())` if `action` is allowed for the provided user and `Err(AccessDenied())` if
     /// this action is not permitted.
     fn is_action_allowed(&self, requester: PublicKey, action: Action) -> Result<()> {
         match self.permissions.get(&requester) {
@@ -268,10 +268,10 @@ impl Perm for UnpubPermissions {
                 if perms.is_allowed(action) {
                     Ok(())
                 } else {
-                    Err(Error::AccessDenied)
+                    Err(Error::AccessDenied("Permission denied".to_string()))
                 }
             }
-            None => Err(Error::AccessDenied),
+            None => Err(Error::AccessDenied("Permission denied".to_string())),
         }
     }
 
@@ -321,8 +321,10 @@ impl Perm for PubPermissions {
             .or_else(|| self.is_action_allowed_by_user(&User::Anyone, action))
         {
             Some(true) => Ok(()),
-            Some(false) => Err(Error::AccessDenied),
-            None => Err(Error::AccessDenied),
+            Some(false) => Err(Error::AccessDenied("Permission denied".to_string())),
+            None => Err(Error::AccessDenied(
+                "No publish permission defined".to_string(),
+            )),
         }
     }
 
@@ -663,7 +665,7 @@ macro_rules! impl_appendable_data {
                 {
                     Ok(())
                 } else {
-                    Err(Error::AccessDenied)
+                    Err(Error::AccessDenied("Not the owner".to_string()))
                 }
             }
         }
@@ -810,7 +812,7 @@ macro_rules! check_perm {
         } else {
             $data
                 .permissions(Index::FromEnd(1))
-                .ok_or(Error::AccessDenied)?
+                .ok_or(Error::AccessDenied("Permission denied".to_string()))?
                 .is_action_allowed($requester, $action)
         }
     };
@@ -1760,7 +1762,7 @@ mod tests {
         assert_eq!(data.check_permission(Action::Append, public_key_0), Ok(()));
         assert_eq!(
             data.check_permission(Action::Append, public_key_1),
-            Err(Error::AccessDenied)
+            Err(Error::AccessDenied("Permission denied".to_string()))
         );
         // data is published - read always allowed
         assert_eq!(data.check_permission(Action::Read, public_key_0), Ok(()));
@@ -1792,7 +1794,7 @@ mod tests {
         assert_eq!(data.check_permission(Action::Append, public_key_2), Ok(()));
         assert_eq!(
             data.check_permission(Action::ManagePermissions, public_key_2),
-            Err(Error::AccessDenied)
+            Err(Error::AccessDenied("Permission denied".to_string()))
         );
         // data is published - read always allowed
         assert_eq!(data.check_permission(Action::Read, public_key_0), Ok(()));
@@ -1828,7 +1830,7 @@ mod tests {
         assert_eq!(data.check_permission(Action::Read, public_key_0), Ok(()));
         assert_eq!(
             data.check_permission(Action::Read, public_key_1),
-            Err(Error::AccessDenied)
+            Err(Error::AccessDenied("Permission denied".to_string()))
         );
 
         // with permissions
@@ -1848,21 +1850,21 @@ mod tests {
         assert_eq!(data.check_permission(Action::Append, public_key_1), Ok(()));
         assert_eq!(
             data.check_permission(Action::ManagePermissions, public_key_1),
-            Err(Error::AccessDenied)
+            Err(Error::AccessDenied("Permission denied".to_string()))
         );
 
         // non-existing key
         assert_eq!(
             data.check_permission(Action::Read, public_key_2),
-            Err(Error::AccessDenied)
+            Err(Error::AccessDenied("Permission denied".to_string()))
         );
         assert_eq!(
             data.check_permission(Action::Append, public_key_2),
-            Err(Error::AccessDenied)
+            Err(Error::AccessDenied("Permission denied".to_string()))
         );
         assert_eq!(
             data.check_permission(Action::ManagePermissions, public_key_2),
-            Err(Error::AccessDenied)
+            Err(Error::AccessDenied("Permission denied".to_string()))
         );
     }
 }
