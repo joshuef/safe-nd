@@ -77,11 +77,12 @@ impl AuthToken {
         let serialised_caveats =
             serialize(&self.caveats).map_err(|e| Error::TokenCorrupt(e.to_string()))?;
 
-        let sig = &self.signature.clone().unwrap();
-
-        match public_key.verify(&sig, &serialised_caveats) {
-            Ok(()) => Ok(true),
-            Err(_) => Ok(false),
+        match &self.signature.clone() {
+            Some(sig) => match public_key.verify(&sig, &serialised_caveats) {
+                Ok(()) => Ok(true),
+                Err(_) => Ok(false),
+            },
+            None => Ok(false),
         }
     }
 
@@ -163,7 +164,7 @@ mod tests {
 
     #[test]
     fn create_token_and_add_caveats_so_sig_changes() {
-        let full_id = generate_safe_key();
+        let safe_key = generate_safe_key();
         let mut token = unwrap!(AuthToken::new());
 
         // no caveat added, no signature added
@@ -172,7 +173,7 @@ mod tests {
 
         let caveat = ("expire".to_string(), "nowthen".to_string());
 
-        token.add_caveat(caveat, &full_id).unwrap();
+        token.add_caveat(caveat, &safe_key).unwrap();
 
         let caveat_len2 = token.caveats.len();
         let sig = &unwrap!(token.signature.clone());
@@ -180,15 +181,15 @@ mod tests {
         assert_eq!(caveat_len2, 1);
 
         let caveat2 = ("expire2".to_string(), "nowthen222".to_string());
-        unwrap!(token.add_caveat(caveat2, &full_id));
+        unwrap!(token.add_caveat(caveat2, &safe_key));
         let new_sig = &unwrap!(token.signature);
         assert_ne!(new_sig, sig);
     }
 
     #[test]
     fn create_token_re_serialize_and_check_validity() {
-        let full_id = generate_safe_key();
-        let public_id = full_id.public_id();
+        let safe_key = generate_safe_key();
+        let public_id = safe_key.public_id();
 
         let mut token = unwrap!(AuthToken::new());
 
@@ -198,7 +199,7 @@ mod tests {
 
         let caveat = ("expire".to_string(), "nowthen".to_string());
 
-        unwrap!(token.add_caveat(caveat, &full_id));
+        unwrap!(token.add_caveat(caveat, &safe_key));
 
         let cereal = unwrap!(serialize(&token));
         let rehydrate: AuthToken = unwrap!(deserialize(&cereal));
@@ -210,8 +211,8 @@ mod tests {
 
     #[test]
     fn create_token_re_serialize_and_check_validity_with_valid_checker() {
-        let full_id = generate_safe_key();
-        let public_id = full_id.public_id();
+        let safe_key = generate_safe_key();
+        let public_id = safe_key.public_id();
 
         let mut token = unwrap!(AuthToken::new());
 
@@ -223,7 +224,7 @@ mod tests {
 
         let caveat = (expire.clone(), "nowthen".to_string());
 
-        unwrap!(token.add_caveat(caveat, &full_id));
+        unwrap!(token.add_caveat(caveat, &safe_key));
 
         let cereal = unwrap!(serialize(&token));
         let rehydrate: AuthToken = unwrap!(deserialize(&cereal));
@@ -243,8 +244,8 @@ mod tests {
 
     #[test]
     fn create_token_re_serialize_and_check_validity_with_invalid_checker() {
-        let full_id = generate_safe_key();
-        let public_id = full_id.public_id();
+        let safe_key = generate_safe_key();
+        let public_id = safe_key.public_id();
 
         let mut token = unwrap!(AuthToken::new());
 
@@ -256,7 +257,7 @@ mod tests {
 
         let caveat = (expire.clone(), "nowthen".to_string());
 
-        unwrap!(token.add_caveat(caveat, &full_id));
+        unwrap!(token.add_caveat(caveat, &safe_key));
 
         let cereal = unwrap!(serialize(&token));
         let rehydrate: AuthToken = unwrap!(deserialize(&cereal));
@@ -276,8 +277,8 @@ mod tests {
 
     #[test]
     fn create_token_re_serialize_and_try_to_check_nonexistant_caveat() {
-        let full_id = generate_safe_key();
-        let public_id = full_id.public_id();
+        let safe_key = generate_safe_key();
+        let public_id = safe_key.public_id();
 
         let mut token = unwrap!(AuthToken::new());
 
@@ -289,7 +290,7 @@ mod tests {
 
         let caveat = (expire, "nowthen".to_string());
 
-        unwrap!(token.add_caveat(caveat, &full_id));
+        unwrap!(token.add_caveat(caveat, &safe_key));
 
         let cereal = unwrap!(serialize(&token));
         let rehydrate: AuthToken = unwrap!(deserialize(&cereal));
@@ -312,7 +313,7 @@ mod tests {
 
     #[test]
     fn token_check_against_another_app_fails() {
-        let full_id = generate_safe_key();
+        let safe_key = generate_safe_key();
         let mut token = unwrap!(AuthToken::new());
 
         // no caveat added, no signature added
@@ -321,7 +322,7 @@ mod tests {
 
         let caveat = ("expire".to_string(), "nowthen".to_string());
 
-        unwrap!(token.add_caveat(caveat, &full_id));
+        unwrap!(token.add_caveat(caveat, &safe_key));
 
         let cereal = unwrap!(serialize(&token));
         let rehydrate: AuthToken = unwrap!(deserialize(&cereal));
@@ -335,8 +336,8 @@ mod tests {
 
     #[test]
     fn token_modify_and_sign_new_keys_fails() {
-        let full_id = generate_safe_key();
-        let public_id = full_id.public_id();
+        let safe_key = generate_safe_key();
+        let public_id = safe_key.public_id();
 
         let mut token = unwrap!(AuthToken::new());
 
@@ -346,7 +347,7 @@ mod tests {
 
         let caveat = ("expire".to_string(), "nowthen".to_string());
 
-        unwrap!(token.add_caveat(caveat, &full_id));
+        unwrap!(token.add_caveat(caveat, &safe_key));
 
         let cereal = unwrap!(serialize(&token));
 
@@ -372,8 +373,8 @@ mod tests {
 
     #[test]
     fn token_modify_and_check_fails() {
-        let full_id = generate_safe_key();
-        let public_id = full_id.public_id();
+        let safe_key = generate_safe_key();
+        let public_id = safe_key.public_id();
 
         let mut token = unwrap!(AuthToken::new());
 
@@ -383,7 +384,7 @@ mod tests {
 
         let caveat = ("expire".to_string(), "nowthen".to_string());
 
-        unwrap!(token.add_caveat(caveat, &full_id));
+        unwrap!(token.add_caveat(caveat, &safe_key));
 
         let cereal = unwrap!(serialize(&token));
 
