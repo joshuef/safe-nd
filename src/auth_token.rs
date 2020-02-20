@@ -94,20 +94,21 @@ impl AuthToken {
 
     /// Pass a function to check against the token. If a caveat to be checked doesn't exist,
     /// verification fails and 'false' is returned.
-    pub fn verify_caveat(
-        &self,
-        caveat: &str,
-        checker: fn(CaveatContents) -> bool,
-    ) -> NdResult<bool> {
+    pub fn verify_caveat(&self, caveat: &str, checker: fn(CaveatContents) -> bool) -> NdResult<()> {
         // Check caveat w/ name exists....
-        let (_caveat_name, caveat_contents) = match &self.get_caveat_by_name(caveat) {
+        let (_caveat_name, caveat_contents) = match self.get_caveat_by_name(caveat) {
             Some(target_caveat) => target_caveat,
-            None => return Ok(false), // Or should we error here?
+            None => return Err(Error::AccessDenied("No such Caveat".to_string())),
         };
 
         // run against supplied checker...
-        let validity = checker(caveat_contents.clone());
-        Ok(validity)
+        if checker(caveat_contents.clone()) {
+            Ok(())
+        } else {
+            Err(Error::AccessDenied(
+                "Caveat verification failed".to_string(),
+            ))
+        }
     }
 
     /// Constructs FFI wrapper for the native Rust object, consuming self.
@@ -239,7 +240,7 @@ mod tests {
         ));
 
         // pass
-        assert!(unwrap!(rehydrate.verify_caveat(&expire, valid_checker)));
+        assert!(rehydrate.verify_caveat(&expire, valid_checker).is_ok());
     }
 
     #[test]
@@ -272,7 +273,7 @@ mod tests {
         ));
 
         // fail
-        assert!(!unwrap!(rehydrate.verify_caveat(&expire, invalid_checker)));
+        assert!(rehydrate.verify_caveat(&expire, invalid_checker).is_err());
     }
 
     #[test]
@@ -305,10 +306,9 @@ mod tests {
         ));
 
         // fail
-        assert!(!unwrap!(rehydrate.verify_caveat(
-            &"non_existant_caveat".to_string(),
-            valid_checker
-        )));
+        assert!(rehydrate
+            .verify_caveat(&"non_existant_caveat".to_string(), valid_checker)
+            .is_err());
     }
 
     #[test]

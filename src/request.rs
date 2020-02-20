@@ -12,7 +12,7 @@ mod login_packet;
 pub use self::login_packet::{LoginPacket, MAX_LOGIN_PACKET_BYTES};
 use crate::{
     AData, ADataAddress, ADataAppendOperation, ADataIndex, ADataOwner, ADataPubPermissions,
-    ADataUnpubPermissions, ADataUser, AppPermissions, Coins, Error, IData, IDataAddress, MData,
+    ADataUnpubPermissions, ADataUser, AuthToken, Coins, Error, IData, IDataAddress, MData,
     MDataAddress, MDataEntryActions, MDataPermissionSet, PublicKey, Response, TransactionId,
     XorName,
 };
@@ -269,18 +269,18 @@ pub enum Request {
     // ===== Client (Owner) to SrcElders =====
     //
     /// List authorised keys and version stored by Elders.
-    ListAuthKeysAndVersion,
+    ListAppCredentialsAndVersion,
     /// Insert an authorised key (for an app, user, etc.).
-    InsAuthKey {
+    InsAppCredentials {
         /// Authorised key to be inserted
         key: PublicKey,
         /// Incremented version
         version: u64,
         /// Permissions
-        permissions: AppPermissions,
+        token: AuthToken,
     },
     /// Delete an authorised key.
-    DelAuthKey {
+    DelAppCredentials {
         /// Authorised key to be deleted
         key: PublicKey,
         /// Incremented version
@@ -340,7 +340,7 @@ impl Request {
             // Login packet
             GetLoginPacket(..) |
             // Client (Owner) to SrcElders
-            ListAuthKeysAndVersion => Type::PrivateGet,
+            ListAppCredentialsAndVersion => Type::PrivateGet,
 
             // Transaction
 
@@ -374,8 +374,8 @@ impl Request {
             CreateLoginPacket { .. } |
             UpdateLoginPacket { .. } |
             // Client (Owner) to SrcElders
-            InsAuthKey { .. } |
-            DelAuthKey { .. } => Type::Mutation,
+            InsAppCredentials { .. } |
+            DelAppCredentials { .. } => Type::Mutation,
         }
     }
 
@@ -415,7 +415,7 @@ impl Request {
             // Login Packet
             GetLoginPacket(..) => Response::GetLoginPacket(Err(error)),
             // Client (Owner) to SrcElders
-            ListAuthKeysAndVersion => Response::ListAuthKeysAndVersion(Err(error)),
+            ListAppCredentialsAndVersion => Response::ListAppCredentialsAndVersion(Err(error)),
 
             // Transaction
 
@@ -447,8 +447,8 @@ impl Request {
             CreateLoginPacket { .. } |
             UpdateLoginPacket { .. } |
             // Client (Owner) to SrcElders
-            InsAuthKey { .. } |
-            DelAuthKey { .. } => Response::Mutation(Err(error)),
+            InsAppCredentials { .. } |
+            DelAppCredentials { .. } => Response::Mutation(Err(error)),
 
         }
     }
@@ -509,9 +509,9 @@ impl fmt::Debug for Request {
                 UpdateLoginPacket { .. } => "UpdateLoginPacket",
                 GetLoginPacket(..) => "GetLoginPacket",
                 // Client (Owner) to SrcElders
-                ListAuthKeysAndVersion => "ListAuthKeysAndVersion",
-                InsAuthKey { .. } => "InsAuthKey",
-                DelAuthKey { .. } => "DelAuthKey",
+                ListAppCredentialsAndVersion => "ListAppCredentialsAndVersion",
+                InsAppCredentials { .. } => "InsAppCredentials",
+                DelAppCredentials { .. } => "DelAppCredentials",
             }
         )
     }

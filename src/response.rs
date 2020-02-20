@@ -9,9 +9,9 @@
 
 use crate::{
     errors::ErrorDebug, AData, ADataEntries, ADataEntry, ADataIndices, ADataOwner,
-    ADataPermissions, ADataPubPermissionSet, ADataUnpubPermissionSet, AppPermissions, Coins, Error,
-    IData, MData, MDataEntries, MDataPermissionSet, MDataValue, MDataValues, PublicKey, Result,
-    Signature, Transaction,
+    ADataPermissions, ADataPubPermissionSet, ADataUnpubPermissionSet, Coins, Error, IData, MData,
+    MDataEntries, MDataPermissionSet, MDataValue, MDataValues, PublicKey, Result, Signature,
+    Transaction,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -89,7 +89,7 @@ pub enum Response {
     // ===== Client (Owner) to SrcElders =====
     //
     /// Get a list of authorised keys and the version of the auth keys container from Elders.
-    ListAuthKeysAndVersion(Result<(BTreeMap<PublicKey, AppPermissions>, u64)>),
+    ListAppCredentialsAndVersion(Result<(BTreeMap<PublicKey, [u8; 32]>, u64)>),
     //
     // ===== Mutation =====
     //
@@ -145,8 +145,8 @@ try_from!(ADataUnpubPermissionSet, GetUnpubADataUserPermissions);
 try_from!(Coins, GetBalance);
 try_from!(Transaction, Transaction);
 try_from!(
-    (BTreeMap<PublicKey, AppPermissions>, u64),
-    ListAuthKeysAndVersion
+    (BTreeMap<PublicKey, [u8; 32]>, u64),
+    ListAppCredentialsAndVersion
 );
 try_from!((Vec<u8>, Signature), GetLoginPacket);
 try_from!((), Mutation);
@@ -203,9 +203,11 @@ impl fmt::Debug for Response {
             // Login Packet
             GetLoginPacket(res) => write!(f, "Response::GetLoginPacket({:?})", ErrorDebug(res)),
             // Client (Owner) to SrcElders
-            ListAuthKeysAndVersion(res) => {
-                write!(f, "Response::ListAuthKeysAndVersion({:?})", ErrorDebug(res))
-            }
+            ListAppCredentialsAndVersion(res) => write!(
+                f,
+                "Response::ListAppCredentialsAndVersion({:?})",
+                ErrorDebug(res)
+            ),
             // Mutation
             Mutation(res) => write!(f, "Response::Mutation({:?})", ErrorDebug(res)),
         }
