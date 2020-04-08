@@ -39,6 +39,8 @@ mod request;
 mod response;
 mod utils;
 
+pub use crdts::{GSet, CvRDT};
+
 pub use append_only_data::{
     Action as ADataAction, Address as ADataAddress, AppendOnlyData,
     AppendOperation as ADataAppendOperation, Data as AData, Entries as ADataEntries,
@@ -195,7 +197,7 @@ impl Distribution<XorName> for Standard {
 /// Wrapper message that contains a message ID and the requester ID along the request or response.
 /// It should also contain a valid signature if it's sent by the owner(s).
 #[allow(clippy::large_enum_variant)]
-#[derive(Hash, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Message {
     /// Request with the message ID.
     Request {

@@ -20,10 +20,16 @@ use std::{
     fmt,
 };
 
+use crdts;
+
+use crdts::GSet;
+
 /// RPC responses from vaults.
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
-#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Response {
+    /// Get GSet
+    GetGSet(Result<GSet<String>>),
     //
     // ===== Immutable Data =====
     //
@@ -156,6 +162,7 @@ impl fmt::Debug for Response {
         use Response::*;
 
         match self {
+            GetGSet(res) => write!(f, "Response::GetGSet({:?})", ErrorDebug(res)),
             // IData
             GetIData(res) => write!(f, "Response::GetIData({:?})", ErrorDebug(res)),
             // MData
