@@ -115,8 +115,8 @@ impl MoneyRequest {
                 Some(Cow::Owned(XorName::from(transfer.id.actor)))
                 // this is handled where the debit is made
             }
-            GetBalance(_) => None,
-            GetHistory { .. } => None,
+            GetBalance( public_key) => Some(Cow::Owned(XorName::from(*public_key))),
+            GetHistory { at, .. } => Some(Cow::Owned(XorName::from(*at))),
         }
     }
 }
