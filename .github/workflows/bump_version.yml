@@ -20,7 +20,7 @@ jobs:
           fetch-depth: '0'
  
       - name: Bump Version
-        uses: joshuef/auto-rust-version-bumper@v2
+        uses: joshuef/auto-rust-version-bumper@v2.1
         with:
           personal-access-token: $PERSONAL_ACCESS_TOKEN
 
