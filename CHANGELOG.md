@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [11.1.0](https://github.com/joshuef/safe-nd/compare/v11.0.0...v11.1.0) (2020-07-27)
+
+
+### Features
+
+* automerge update ([028127a](https://github.com/joshuef/safe-nd/commit/028127aa680aacf83a8fc6132213e70d25ded66e))
+
 ## 11.1.0 (2020-07-21)
 
 
