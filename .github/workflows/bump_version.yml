@@ -21,7 +21,7 @@ jobs:
  
 
       - name: Bump Version
-        uses: joshuef/auto-rust-version-bumper@v2.9
+        uses: joshuef/auto-rust-version-bumper@v2.10
         with:
           personal-access-token: $PERSONAL_ACCESS_TOKEN
           secret: ${{ secrets.GITHUB_TOKEN }}
@@ -32,7 +32,7 @@ jobs:
     - name: Merge Version change PR
       uses: ridedott/merge-me-action@master
       with:
-        GITHUB_LOGIN: GitHub Action
+        GITHUB_LOGIN: rust-auto-merge-bot
         GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         MERGE_METHOD: REBASE
 
