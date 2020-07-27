@@ -10,7 +10,7 @@ name: Build and Publish (on tag)
 on:
   push:
     branches:
-      - mmaster
+      - master
 
 env:
   # Run all cargo commands with --verbose.

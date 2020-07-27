@@ -7,10 +7,6 @@ name: Merge Version Change PRs automatically
 
 on: pull_request
 
-# env:
-  # Run all cargo commands with --verbose.
-
-
 jobs:
   merge:
     runs-on: ubuntu-latest
