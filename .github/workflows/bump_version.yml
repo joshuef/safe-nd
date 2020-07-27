@@ -19,6 +19,7 @@ jobs:
         with:
           fetch-depth: '0'
  
+          
       - name: Bump Version
         uses: joshuef/auto-rust-version-bumper@v2.2
         with:
