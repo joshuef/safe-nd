@@ -18,6 +18,7 @@ jobs:
   checks:
     name: Clippy & fmt
     runs-on: ubuntu-latest
+    if: "!startsWith(github.ref, 'version-bump')"
     steps:
       - uses: actions/checkout@v2
       # Install Rust and required components
