@@ -23,4 +23,4 @@ jobs:
       - name: Bump Version
         uses: joshuef/auto-rust-version-bumper@v2.13
         with:
-          token: ${{ secrets.BUMPER_PR }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
