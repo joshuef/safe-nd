@@ -25,16 +25,6 @@ jobs:
         with:
           personal-access-token: $PERSONAL_ACCESS_TOKEN
           secret: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  merge:
-    runs-on: ubuntu-latest
-    needs: bump
-    steps:
-    - name: Merge Version change PR
-      uses: ridedott/merge-me-action@master
-      with:
-        GITHUB_LOGIN: rust-auto-merge-bot
-        GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-        MERGE_METHOD: REBASE
-
+ 
   
   
