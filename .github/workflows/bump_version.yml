@@ -21,7 +21,7 @@ jobs:
  
 
       - name: Bump Version
-        uses: joshuef/auto-rust-version-bumper@v2.10
+        uses: joshuef/auto-rust-version-bumper@v2.11
         with:
           personal-access-token: $PERSONAL_ACCESS_TOKEN
           secret: ${{ secrets.GITHUB_TOKEN }}
