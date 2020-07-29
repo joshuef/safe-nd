@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [11.1.0](https://github.com/joshuef/safe-nd/compare/v11.0.0...v11.1.0) (2020-07-29)
+
+
+### Features
+
+* **CD:** Automatically create a github release w/ latest changes ([151a573](https://github.com/joshuef/safe-nd/commit/151a573998e9763867d515bd0bb6012861d352a1))
+* **CD:** Enable auto merge of generated release PRs ([3f939d4](https://github.com/joshuef/safe-nd/commit/3f939d4a5ce338a7b262d35324804334d45a4faa))
+* automerge update ([c55da4d](https://github.com/joshuef/safe-nd/commit/c55da4d6731492523a3874fac17bcc539bca296f))
+
 ### 0.10.4 (2020-07-29)
 
 
