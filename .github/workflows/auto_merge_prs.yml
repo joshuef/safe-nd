@@ -16,7 +16,7 @@ jobs:
         fetch-depth: '0'
     - name: get commit message
       run: |
-           echo ::set-env name=commitmsg::$(git log --format=%B -n 1 ${{ github.event.after }})
+           echo ::set-env name=commitmsg::$(git log --format=%B -n 1 ${{ github.event.pull_request.head.sha }})
     - name: show commit message
       run : echo $commitmsg
     - name: Merge Version change PR
