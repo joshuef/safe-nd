@@ -14,14 +14,13 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: '0'
-    - name: Get Commit Message
+    - name: get commit message
       run: |
-        echo $GITHUB_REF
-        MSG=$(git log $GITHUB_REF -1 --pretty=%B)
-        echo "::set-env name=MSG::${MSG}"
-    - run: echo $MSG
+           echo ::set-env name=commitmsg::$(git log --format=%B -n 1 ${{ github.event.after }})
+    - name: show commit message
+      run : echo $commitmsg
     - name: Merge Version change PR
-      if: startsWith( env.MSG, 'chore(release):')
+      if: startsWith( env.commitmsg, 'chore(release):')
       uses: ridedott/merge-me-action@81667e6ae186ddbe6d3c3186d27d91afa7475e2c
       with:
         GITHUB_LOGIN: dirvine
