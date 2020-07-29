@@ -16,8 +16,9 @@ jobs:
         fetch-depth: '0'
     - name: Get Commit Message
       run: |
-        MSG=$(git log -1 --pretty=%B)
-        echo "::set-env name=COMMIT_MESSAGE::${MSG}"
+        echo $GITHUB_REF
+        MSG=$(git log $GITHUB_REF -1 --pretty=%B)
+        echo "::set-env name=MSG::${MSG}"
     - run: echo $MSG
     - name: Merge Version change PR
       if: startsWith( env.MSG, 'chore(release):')
