@@ -10,11 +10,10 @@
 pub mod client;
 pub mod node;
 
-use crate::{utils, ClientFullId, Keypair, PublicKey, Result, Signature, XorName};
+use crate::{utils, PublicKey, Result, XorName};
 use multibase::Decodable;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Display, Formatter};
-use std::sync::Arc;
 
 /// An enum representing the identity of a network Node or Client.
 ///
