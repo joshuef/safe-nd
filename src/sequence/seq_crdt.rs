@@ -152,7 +152,13 @@ where
     /// Apply a remote data CRDT operation to this replica of the Sequence.
     pub fn apply_data_op(&mut self, op: CrdtDataOperation<A, Entry>) -> Result<()> {
         let policy_id = op.ctx.clone();
-        println!("Applying data op, policy id is: {:?}", policy_id);
+        match &op.crdt_op {
+            Op::Insert { val, .. } => {
+                println!("Applying insert op, entry is: {:?}", String::from_utf8(val.to_vec()));
+
+            },
+            _ => {}
+        }
         if self.policy.find_entry(&policy_id).is_some() {
 
             // println!("..............policylen...... {:?}", self.policy.len());

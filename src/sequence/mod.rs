@@ -732,9 +732,19 @@ mod tests {
         // verify replicas have the expected length
         // also verify replicas failed to get with index beyond reported length
         let index_beyond = SequenceIndex::FromStart(expected_len);
+
+
         for r in &replicas {
+
+            if r.len() != expected_len {
+                println!("!!!!!!!!!!!!!!!!  we're off here..., last entry is: {:?}", String::from_utf8(r.last_entry().unwrap().to_vec()));
+                
+            }
             assert_eq!(r.len(), expected_len);
             assert_eq!(r.get(index_beyond), None);
+
+            println!("as expected: last entry is: {:?}", String::from_utf8(r.last_entry().unwrap().to_vec()));
+
             // println!("legnth verified");
 
         }
@@ -930,7 +940,7 @@ mod tests {
             // now we randomly shuffle ops and apply at each replica
             for (i, replica) in &mut replicas.iter_mut().enumerate() {
 
-                println!("replica: {:?}. Applying {:?} ops to a replica", i, opslen);
+                println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Replica: {:?}. Applying {:?} ops to a replica", i, opslen);
                 let ops = ops.clone();
                 // ops.shuffle(&mut OsRng);
 
