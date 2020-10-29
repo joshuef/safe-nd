@@ -792,7 +792,7 @@ mod tests {
             replica2.apply_public_policy_op(owner_op)?;
 
             // Append an item on replicas
-            let append_op = replica1.append(s.clone())?;
+            let append_op = replica1.append(s)?;
             replica2.apply_data_op(append_op)?;
 
             verify_data_convergence(vec![replica1, replica2], 1);
@@ -869,6 +869,42 @@ mod tests {
             for data in dataset {
                 let op = replicas[0].append(data)?;
                 ops.push(op);
+            }
+
+            // now we randomly shuffle ops and apply at each replica
+            for replica in &mut replicas {
+                let mut ops = ops.clone();
+                ops.shuffle(&mut OsRng);
+
+                for op in ops {
+
+                    replica.apply_data_op(op)?;
+                }
+
+            }
+
+            verify_data_convergence(replicas, dataset_length);
+
+        }
+
+
+
+        #[test]
+        fn proptest_converge_with_shuffled_ops_from_many_replicas_across_arbitrary_number_of_replicas(
+            dataset in generate_dataset(100),
+            mut replicas in generate_replicas(500)
+        ) {
+            let dataset_length = dataset.len() as u64;
+
+            // generate an ops set using random replica for each data
+            let mut ops = vec![];
+
+            for data in dataset {
+                if let Some(replica) = replicas.choose_mut(&mut OsRng)
+                {
+                    let op = replica.append(data)?;
+                    ops.push(op);
+                }
             }
 
             // now we randomly shuffle ops and apply at each replica
