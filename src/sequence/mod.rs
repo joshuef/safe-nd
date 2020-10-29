@@ -766,7 +766,7 @@ mod tests {
 
             let sdata_tag = 43_001u64;
 
-            // Instantiate the same Sequence on two replicas with two diff actors
+            // Instantiate the same Sequence on two replicas
             let mut replica1 = Sequence::new_public(actor1, sequence_name, sdata_tag);
             let mut replica2 = Sequence::new_public(actor1, sequence_name, sdata_tag);
 
@@ -795,7 +795,7 @@ mod tests {
 
             let sdata_tag = 43_001u64;
 
-            // Instantiate the same Sequence on two replicas with two diff actors
+            // Instantiate the same Sequence on two replicas
             let mut replica1 = Sequence::new_public(actor1, sequence_name, sdata_tag);
             let mut replica2 = Sequence::new_public(actor1, sequence_name, sdata_tag);
 
