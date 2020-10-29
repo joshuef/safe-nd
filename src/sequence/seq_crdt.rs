@@ -154,13 +154,14 @@ where
         let policy_id = op.ctx.clone();
         match &op.crdt_op {
             Op::Insert { val, .. } => {
-                println!("Applying insert op, entry is: {:?}", String::from_utf8(val.to_vec()));
-
-            },
+                println!(
+                    "Applying insert op, entry is: {:?}",
+                    String::from_utf8(val.to_vec())
+                );
+            }
             _ => {}
         }
         if self.policy.find_entry(&policy_id).is_some() {
-
             // println!("..............policylen...... {:?}", self.policy.len());
             // We have to apply the op to all branches/copies of the Sequence as it may
             // be an old operation which appends an item to the master branch of items
@@ -194,8 +195,7 @@ where
 
                     // Apply the CRDT operation to the LSeq data
                     lseq.apply(op.crdt_op.clone());
-                }
-                else{
+                } else {
                     println!(">>>>>>>>>> NOT APPLYING OP")
                 }
             }
