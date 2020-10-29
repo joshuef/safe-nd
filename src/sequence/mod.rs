@@ -725,12 +725,18 @@ mod tests {
 
     // verify data convergence on a set of replicas and with the expected length
     fn verify_data_convergence(replicas: Vec<Sequence>, expected_len: u64) {
+        // println!("......................");
+        // println!("......................");
+        // println!("verifying");
+
         // verify replicas have the expected length
         // also verify replicas failed to get with index beyond reported length
         let index_beyond = SequenceIndex::FromStart(expected_len);
         for r in &replicas {
             assert_eq!(r.len(), expected_len);
             assert_eq!(r.get(index_beyond), None);
+            // println!("legnth verified");
+
         }
 
         // now verify that the items are the same in all replicas
@@ -739,6 +745,8 @@ mod tests {
             let r0_entry = &replicas[0].get(index);
             for r in &replicas {
                 assert_eq!(r0_entry, &r.get(index));
+                // println!("data is the same");
+
             }
         }
     }
@@ -892,30 +900,51 @@ mod tests {
         #[test]
         fn proptest_converge_with_shuffled_ops_from_many_replicas_across_arbitrary_number_of_replicas(
             dataset in generate_dataset(100),
-            mut replicas in generate_replicas(500)
+            mut replicas in generate_replicas(10)
         ) {
             let dataset_length = dataset.len() as u64;
-
+            
             // generate an ops set using random replica for each data
             let mut ops = vec![];
-
+            
             for data in dataset {
                 if let Some(replica) = replicas.choose_mut(&mut OsRng)
                 {
                     let op = replica.append(data)?;
                     ops.push(op);
                 }
+                else{
+                    println!("NO OP MADE")
+                }
+            }
+            
+            let opslen = ops.len() as u64;
+            println!("datlen: {:?}, ops len: {:?}", dataset_length, ops.len());
+
+            if dataset_length != opslen
+            {
+
+                println!("AHAAAAAAAAAAAAAAAAAAAAAAAAAAa");
             }
 
             // now we randomly shuffle ops and apply at each replica
-            for replica in &mut replicas {
-                let mut ops = ops.clone();
-                ops.shuffle(&mut OsRng);
+            for (i, replica) in &mut replicas.iter_mut().enumerate() {
+
+                println!("replica: {:?}. Applying {:?} ops to a replica", i, opslen);
+                let ops = ops.clone();
+                // ops.shuffle(&mut OsRng);
 
                 for op in ops {
 
-                    replica.apply_data_op(op)?;
+                    match replica.apply_data_op(op) {
+                        Ok(_) => {
+                            // println!("op applied OK")
+                        },
+                        Err(error) => println!("!!!!!!!!!!!!!!!1Error applying op: {:?}", error)
+                    }
                 }
+
+                println!("replica: {:?}. replica len now: {:?} for ops len {:?}", i, replica.len(), opslen);
 
             }
 
