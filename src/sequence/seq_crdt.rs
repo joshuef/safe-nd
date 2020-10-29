@@ -152,7 +152,10 @@ where
     /// Apply a remote data CRDT operation to this replica of the Sequence.
     pub fn apply_data_op(&mut self, op: CrdtDataOperation<A, Entry>) -> Result<()> {
         let policy_id = op.ctx.clone();
+        println!("Applying data op, policy id is: {:?}", policy_id);
         if self.policy.find_entry(&policy_id).is_some() {
+
+            // println!("..............policylen...... {:?}", self.policy.len());
             // We have to apply the op to all branches/copies of the Sequence as it may
             // be an old operation which appends an item to the master branch of items
             for LSeqEntry {
@@ -186,10 +189,14 @@ where
                     // Apply the CRDT operation to the LSeq data
                     lseq.apply(op.crdt_op.clone());
                 }
+                else{
+                    println!(">>>>>>>>>> NOT APPLYING OP")
+                }
             }
 
             Ok(())
         } else {
+            println!("!!!!!!!!!!!!!!!!!1");
             // Operation is not causally ready as depends on a policy
             // version we aren't aware of yet.
             // Return error so sender can retry later and/or send the missing policy op/s
