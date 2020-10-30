@@ -745,7 +745,7 @@ mod tests {
     }
 
     // Generate a vec of Sequence replicas of some length
-    fn generate_replicas(max_quantity: usize) -> impl Strategy<Value = Vec<Sequence>> {
+    fn gen_replicas(max_quantity: usize) -> impl Strategy<Value = Vec<Sequence>> {
         let xorname = XorName::random();
         let tag = 45_000u64;
         let owner = gen_public_key();
@@ -776,6 +776,14 @@ mod tests {
     // Generate a vec of Sequence entries
     fn generate_dataset(max_quantity: usize) -> impl Strategy<Value = Vec<Vec<u8>>> {
         prop::collection::vec(generate_seq_entry(), 1..max_quantity + 1)
+    }
+
+    // Generates a vec of Sequence entries each with a value suggesting
+    // the delivery chance of the op that gets created with the entry
+    fn gen_dataset_and_delivery_chance(
+        max_quantity: usize,
+    ) -> impl Strategy<Value = Vec<(Vec<u8>, u8)>> {
+        prop::collection::vec((generate_seq_entry(), any::<u8>()), 1..max_quantity + 1)
     }
 
     proptest! {
@@ -842,7 +850,7 @@ mod tests {
         #[test]
         fn proptest_seq_converge_with_many_random_data_across_arbitrary_number_of_replicas(
             dataset in generate_dataset(500),
-            mut replicas in generate_replicas(50)
+            mut replicas in gen_replicas(50)
         ) {
             let dataset_length = dataset.len() as u64;
 
@@ -865,7 +873,7 @@ mod tests {
         #[test]
         fn proptest_converge_with_shuffled_op_set_across_arbitrary_number_of_replicas(
             dataset in generate_dataset(100),
-            mut replicas in generate_replicas(500)
+            mut replicas in gen_replicas(500)
         ) {
             let dataset_length = dataset.len() as u64;
 
@@ -898,7 +906,7 @@ mod tests {
         #[test]
         fn proptest_converge_with_shuffled_ops_from_many_replicas_across_arbitrary_number_of_replicas(
             dataset in generate_dataset(1000),
-            mut replicas in generate_replicas(100)
+            mut replicas in gen_replicas(100)
         ) {
             let dataset_length = dataset.len() as u64;
 
@@ -933,8 +941,7 @@ mod tests {
 
         #[test]
         fn proptest_dropped_data_can_be_reapplied_and_we_converge(
-            dataset in prop::collection::vec(generate_seq_entry(), 100..1001)
-
+            dataset in gen_dataset_and_delivery_chance(1000),
         ) {
 
             let actor1 = gen_public_key();
@@ -955,24 +962,23 @@ mod tests {
             let dataset_length = dataset.len() as u64;
 
             let mut ops = vec![];
-            for data in dataset {
+            for (data, delivery_chance) in dataset {
                     let op = replica1.append(data)?;
-                    ops.push(op);
+                    ops.push((op, delivery_chance));
             }
 
-            for op in ops.clone() {
-                let delivery_chance : u32 = OsRng.gen_range(0, 10);
-                if delivery_chance < 2 {
+            for (op, delivery_chance) in ops.clone() {
+                if delivery_chance < u8::MAX / 3 {
                     replica2.apply_data_op(op)?;
                 }
             }
 
-            // shere we statistically should have dropped some messages
+            // here we statistically should have dropped some messages
             assert_ne!(replica2.len(), replica1.len());
 
             // reapply all ops
-            for op in ops {
-                    replica2.apply_data_op(op)?;
+            for (op, _) in ops {
+                replica2.apply_data_op(op)?;
             }
 
             // now we converge
@@ -980,21 +986,20 @@ mod tests {
 
         }
 
-
         #[test]
         fn proptest_converge_with_shuffled_ops_from_many_while_dropping_some_at_random(
-            dataset in generate_dataset(1000),
-            mut replicas in generate_replicas(100),
+            dataset in gen_dataset_and_delivery_chance(1000),
+            mut replicas in gen_replicas(100),
         ) {
             let dataset_length = dataset.len() as u64;
 
             // generate an ops set using random replica for each data
             let mut ops = vec![];
-            for data in dataset {
+            for (data, delivery_chance) in dataset {
                 if let Some(replica) = replicas.choose_mut(&mut OsRng)
                 {
                     let op = replica.append(data)?;
-                    ops.push(op);
+                    ops.push((op, delivery_chance));
                 }
             }
 
@@ -1007,9 +1012,8 @@ mod tests {
                 let mut ops = ops.clone();
                 ops.shuffle(&mut OsRng);
 
-                for op in ops {
-                    let delivery_chance : u32 = OsRng.gen_range(0, 10);
-                    if delivery_chance > 3 {
+                for (op, delivery_chance) in ops {
+                    if delivery_chance > u8::MAX / 3 {
                         replica.apply_data_op(op)?;
                     }
                 }
@@ -1028,7 +1032,7 @@ mod tests {
             dataset in generate_dataset(1000),
             // should be same number as dataset
             bogus_dataset in generate_dataset(1000),
-            mut replicas in generate_replicas(100),
+            mut replicas in gen_replicas(100),
 
         ) {
             let dataset_length = dataset.len();
