@@ -1003,7 +1003,7 @@ mod tests {
         // Let's assert that append_op2 created a branch of data on both replicas
         // due to new policy having been applied concurrently, thus only first
         // item shall be returned from main branch of data
-        verify_data_convergence(vec![replica1, replica2], 1);
+        verify_data_convergence(vec![replica1, replica2], 1)?;
 
         Ok(())
     }
@@ -1068,7 +1068,7 @@ mod tests {
         // Retrying to apply append op to replica2 should be successful, due
         // to now being causally ready with the new policy
         replica2.apply_data_op(append_op)?;
-        verify_data_convergence(vec![replica1, replica2, replica3], 1);
+        verify_data_convergence(vec![replica1, replica2, replica3], 1)?;
 
         Ok(())
     }
@@ -1131,7 +1131,7 @@ mod tests {
         // Let's assert the state on all replicas to assure convergence
         // One of the items appended concurrently should not belong to
         // the master branch of the data thus we should see only 2 items
-        verify_data_convergence(vec![replica1, replica2], 2);
+        verify_data_convergence(vec![replica1, replica2], 2)?;
 
         Ok(())
     }
@@ -1380,7 +1380,7 @@ mod tests {
     }
 
     // Generate a vec of Sequence replicas of some length
-    fn gen_replicas(max_quantity: usize) -> impl Strategy<Value = (Vec<Sequence>, PublicKey)> {
+    fn generate_replicas(max_quantity: usize) -> impl Strategy<Value = (Vec<Sequence>, PublicKey)> {
         let xorname = XorName::random();
         let tag = 45_000u64;
         let owner = generate_public_key();
@@ -1389,7 +1389,7 @@ mod tests {
             let mut replicas = Vec::with_capacity(quantity);
             for _ in 0..quantity {
                 let actor = generate_public_key();
-                let replica = Sequence::new_public(actor, actor, xorname, tag);
+                let replica = Sequence::new_public(owner, actor, xorname, tag);
                 replicas.push(replica);
             }
 
@@ -1450,7 +1450,7 @@ mod tests {
             let append_op = replica1.append(s)?;
             replica2.apply_data_op(append_op)?;
 
-            verify_data_convergence(vec![replica1, replica2], 1);
+            verify_data_convergence(vec![replica1, replica2], 1)?;
 
         }
 
@@ -1484,14 +1484,14 @@ mod tests {
                 replica2.apply_data_op(append_op)?;
             }
 
-            verify_data_convergence(vec![replica1, replica2], dataset_length);
+            verify_data_convergence(vec![replica1, replica2], dataset_length)?;
 
         }
 
         #[test]
         fn proptest_seq_converge_with_many_random_data_across_arbitrary_number_of_replicas(
             dataset in generate_dataset(500),
-            (mut replicas, _pk) in gen_replicas(50)
+            (mut replicas, _pk) in generate_replicas(50)
         ) {
             let dataset_length = dataset.len() as u64;
 
@@ -1506,7 +1506,7 @@ mod tests {
                 }
             }
 
-            verify_data_convergence(replicas, dataset_length);
+            verify_data_convergence(replicas, dataset_length)?;
 
         }
 
@@ -1514,7 +1514,7 @@ mod tests {
         #[test]
         fn proptest_converge_with_shuffled_op_set_across_arbitrary_number_of_replicas(
             dataset in generate_dataset(100),
-            (mut replicas, _pk) in gen_replicas(500)
+            (mut replicas, _pk) in generate_replicas(500)
         ) {
             let dataset_length = dataset.len() as u64;
 
@@ -1538,7 +1538,7 @@ mod tests {
 
             }
 
-            verify_data_convergence(replicas, dataset_length);
+            verify_data_convergence(replicas, dataset_length)?;
 
         }
 
@@ -1547,7 +1547,7 @@ mod tests {
         #[test]
         fn proptest_converge_with_shuffled_ops_from_many_replicas_across_arbitrary_number_of_replicas(
             dataset in generate_dataset(1000),
-            (mut replicas, _pk) in gen_replicas(100)
+            (mut replicas, _pk) in generate_replicas(100)
         ) {
             let dataset_length = dataset.len() as u64;
 
@@ -1575,7 +1575,7 @@ mod tests {
                 }
             }
 
-            verify_data_convergence(replicas, dataset_length);
+            verify_data_convergence(replicas, dataset_length)?;
         }
 
 
@@ -1654,7 +1654,7 @@ mod tests {
             }
 
             // now we converge
-            verify_data_convergence(vec![replica1, replica2], dataset_length);
+            verify_data_convergence(vec![replica1, replica2], dataset_length)?;
 
         }
 
@@ -1759,7 +1759,7 @@ mod tests {
             }
 
             // now we converge
-            verify_data_convergence(vec![replica1, replica2], dataset_length);
+            verify_data_convergence(vec![replica1, replica2], dataset_length)?;
 
         }
 
@@ -1806,7 +1806,7 @@ mod tests {
             }
 
             // now we converge
-            verify_data_convergence(vec![replica1, replica2], dataset_length);
+            verify_data_convergence(vec![replica1, replica2], dataset_length)?;
 
         }
 
@@ -1814,7 +1814,7 @@ mod tests {
         #[ignore]
         fn proptest_converge_with_shuffled_ops_from_many_while_dropping_some_at_random(
             dataset in gen_dataset_and_probability(1000),
-            (mut replicas, _pk) in gen_replicas(100),
+            (mut replicas, _pk) in generate_replicas(100),
         ) {
             let dataset_length = dataset.len() as u64;
 
@@ -1849,7 +1849,7 @@ mod tests {
             // We can get errors there by dropping from sync with one replica...
             //
             // Q: how to expand this across many replicas and simulate dropping messages? Is that wortwhile here at the data itself...?
-            verify_data_convergence(replicas, dataset_length);
+            verify_data_convergence(replicas, dataset_length)?;
         }
 
         #[test]
@@ -1857,7 +1857,7 @@ mod tests {
             dataset in generate_dataset(1000),
             // should be same number as dataset
             bogus_dataset in generate_dataset(1000),
-            (mut replicas, _pk) in gen_replicas(100),
+            (mut replicas, _pk) in generate_replicas(100),
 
         ) {
             let dataset_length = dataset.len();
@@ -1913,7 +1913,7 @@ mod tests {
             // check we get an error per bogus datum per replica
             assert_eq!(err_count.len(), bogus_dataset_length * number_replicas);
 
-            verify_data_convergence(replicas, dataset_length as u64);
+            verify_data_convergence(replicas, dataset_length as u64)?;
 
         }
     }
