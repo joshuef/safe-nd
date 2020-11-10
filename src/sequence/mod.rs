@@ -1415,7 +1415,7 @@ mod tests {
 
     // Generates a vec of Sequence entries each with a value suggesting
     // the delivery chance of the op that gets created with the entry
-    fn gen_dataset_and_probability(
+    fn generate_dataset_and_probability(
         max_quantity: usize,
     ) -> impl Strategy<Value = Vec<(Vec<u8>, u8)>> {
         prop::collection::vec((generate_seq_entry(), any::<u8>()), 1..max_quantity + 1)
@@ -1581,7 +1581,7 @@ mod tests {
 
         #[test]
         fn proptest_we_converge_with_ownership_changes(
-            dataset in gen_dataset_and_probability(1000),
+            dataset in generate_dataset_and_probability(1000),
         ) {
 
             let actor1 = generate_public_key();
@@ -1605,7 +1605,7 @@ mod tests {
             for (data, policy_change_chance) in dataset {
                     let op = replica1.append(data)?;
                     ops.push(OpType::Data(op));
-
+                    
                     if policy_change_chance < u8::MAX / 3 {
                         let new_owner = generate_public_key();
 
@@ -1613,15 +1613,23 @@ mod tests {
                         let user_perms =
                             SequencePublicPermissions::new(/*append=*/ true, /*admin=*/ false);
                         let _ = perms.insert(SequenceUser::Key(actor1), user_perms);
-                        let owner_op = replica1.set_public_policy(new_owner, perms)?;
+                        match replica1.set_public_policy(new_owner, perms) {
+                            Ok(op) => {
+                                // This will only actualy happen once
+                                ops.push(OpType::Owner(op));
+                            },
+                            Err(err) => {
+                                // do nothing
+                            }
+                        };
 
-                        ops.push(OpType::Owner(owner_op));
 
                     }
             }
+
             let mut suffled_ops = ops.clone();
             suffled_ops.shuffle(&mut OsRng);
-
+            
             for op in suffled_ops.clone() {
                 match op {
                     OpType::Data(op) => {
@@ -1632,22 +1640,22 @@ mod tests {
                         let _ = replica2.apply_data_op(op);
                     },
                     OpType::Owner(op) => {
-
+                        
                         let _ = replica2.apply_public_policy_op(op);
                     },
                 }
             }
-
+            
             // reapply any potentially failed ops
             for op in ops.clone() {
-
+                
                 match op {
                     OpType::Data(op) => {
-
+                        
                         replica2.apply_data_op(op)?;
                     },
                     OpType::Owner(op) => {
-
+                        
                         replica2.apply_public_policy_op(op)?;
                     },
                 }
@@ -1765,7 +1773,7 @@ mod tests {
 
         #[test]
         fn proptest_dropped_data_can_be_reapplied_and_we_converge(
-            dataset in gen_dataset_and_probability(1000),
+            dataset in generate_dataset_and_probability(1000),
         ) {
 
             let actor1 = generate_public_key();
@@ -1813,7 +1821,7 @@ mod tests {
         #[test]
         #[ignore]
         fn proptest_converge_with_shuffled_ops_from_many_while_dropping_some_at_random(
-            dataset in gen_dataset_and_probability(1000),
+            dataset in generate_dataset_and_probability(1000),
             (mut replicas, _pk) in generate_replicas(100),
         ) {
             let dataset_length = dataset.len() as u64;
