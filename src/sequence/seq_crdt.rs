@@ -8,13 +8,16 @@
 // Software.
 
 use super::metadata::{Address, Entries, Entry, Index, Perm};
-use crate::{Error, PublicKey, Result};
+use crate::{Error, PublicKey, Result, Signature};
+use bincode::{deserialize, serialize};
 pub use crdts::{lseq::Op, Actor};
 use crdts::{
     lseq::{ident::Identifier, Entry as LSeqEntry, LSeq},
     CmRDT,
 };
+use ed25519_dalek::Signature as EdSignature;
 use serde::{Deserialize, Serialize};
+use signature::{Signer, Verifier};
 use std::{
     cmp::Ordering::{Equal, Greater, Less},
     collections::BTreeMap,
@@ -31,7 +34,7 @@ const LSEQ_TREE_BASE: u8 = 10; // arity of 1024 at root
 
 /// CRDT Data operation applicable to other Sequence replica.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Hash)]
-pub struct CrdtDataOperation<A: Actor + Display + std::fmt::Debug, T> {
+pub struct CrdtDataOperation<A: Actor + Display + std::fmt::Debug + Serialize, T> {
     /// Address of a Sequence object on the network.
     pub address: Address,
     /// The data operation to apply.
@@ -40,11 +43,13 @@ pub struct CrdtDataOperation<A: Actor + Display + std::fmt::Debug, T> {
     pub source: PublicKey,
     /// The context (policy) this operation depends on
     pub ctx: Identifier<A>,
+    /// The signature of the crdt_top
+    pub signature: Signature,
 }
 
 /// CRDT Policy operation applicable to other Sequence replica.
 #[derive(Clone, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Hash)]
-pub struct CrdtPolicyOperation<A: Actor + Display + std::fmt::Debug, P> {
+pub struct CrdtPolicyOperation<A: Actor + Display + std::fmt::Debug + Serialize, P> {
     /// Address of a Sequence object on the network.
     pub address: Address,
     /// The policy operation to apply.
@@ -53,14 +58,18 @@ pub struct CrdtPolicyOperation<A: Actor + Display + std::fmt::Debug, P> {
     pub source: PublicKey,
     /// The context (previous policy) this operation depends on
     pub ctx: Option<(Identifier<A>, Option<Identifier<A>>)>,
+    /// The signature of the crdt_top
+    pub signature: Signature,
 }
 
 /// Sequence data type as a CRDT with Access Control
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd)]
-pub struct SequenceCrdt<A, P>
+pub struct SequenceCrdt<A, P, S>
 where
-    A: Actor + Display + std::fmt::Debug,
-    P: Perm + Hash + Clone,
+    A: Actor + Display + std::fmt::Debug + Serialize,
+    P: Perm + Hash + Clone + Serialize,
+    // T: EdSignature,
+    S: Signer<EdSignature> + Verifier<EdSignature>,
 {
     /// Actor of this piece of data
     pub(crate) actor: A,
@@ -73,12 +82,15 @@ where
     /// History of the Policy matrix, each entry representing a version of the Policy matrix
     /// and the last item in the Sequence when this Policy was applied.
     policy: LSeq<(P, Option<Identifier<A>>), A>,
+    /// Signer and verifier of sigs
+    signatory: S,
 }
 
-impl<A, P> Display for SequenceCrdt<A, P>
+impl<A, P, S> Display for SequenceCrdt<A, P, S>
 where
-    A: Actor + Display + std::fmt::Debug,
-    P: Perm + Hash + Clone,
+    A: Actor + Display + std::fmt::Debug + Serialize,
+    P: Perm + Hash + Clone + Serialize,
+    S: Signer<EdSignature> + Verifier<EdSignature>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "[")?;
@@ -94,18 +106,20 @@ where
     }
 }
 
-impl<A, P> SequenceCrdt<A, P>
+impl<A, P, S> SequenceCrdt<A, P, S>
 where
-    A: Actor + Display + std::fmt::Debug,
-    P: Perm + Hash + Clone,
+    A: Actor + Display + std::fmt::Debug + Serialize,
+    P: Perm + Hash + Clone + Serialize,
+    S: Signer<EdSignature> + Verifier<EdSignature>,
 {
     /// Constructs a new 'SequenceCrdt'.
-    pub fn new(actor: A, address: Address) -> Self {
+    pub fn new(actor: A, address: Address, signatory: S) -> Self {
         Self {
             actor: actor.clone(),
             address,
             data: BTreeMap::default(),
             policy: LSeq::new_with_args(actor, LSEQ_TREE_BASE, LSEQ_BOUNDARY),
+            signatory,
         }
     }
 
@@ -152,6 +166,9 @@ where
                 Some(lseq) => {
                     // Append the entry to the LSeq corresponding to current Policy
                     let crdt_op = lseq.append(entry);
+                    let bytes_op =
+                        serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
+                    let signature = Signature::Ed25519(self.signatory.sign(&bytes_op));
 
                     // We return the operation as it may need to be broadcasted to other replicas
                     Ok(CrdtDataOperation {
@@ -159,6 +176,7 @@ where
                         crdt_op,
                         source,
                         ctx: cur_policy.id.clone(),
+                        signature,
                     })
                 }
             },
@@ -254,12 +272,15 @@ where
         // Causality info for this Policy op includes current Policy and item Identifiers
         let ctx = prev_policy_id.map(|policy_id| (policy_id, cur_last_item));
 
+        let bytes_op = serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
+        let signature = Signature::Ed25519(self.signatory.sign(&bytes_op));
         // We return the operation as it may need to be broadcasted to other replicas
         Ok(CrdtPolicyOperation {
             address: *self.address(),
             crdt_op,
             source,
             ctx,
+            signature,
         })
     }
 
