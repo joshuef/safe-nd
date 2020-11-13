@@ -17,7 +17,6 @@ use crdts::{
 };
 use ed25519_dalek::Signature as EdSignature;
 use serde::{Deserialize, Serialize};
-use signature::{Signer, Verifier};
 use std::hash::Hasher;
 use std::{
     cmp::Ordering,
@@ -85,10 +84,12 @@ where
     /// History of the Policy matrix, each entry representing a version of the Policy matrix
     /// and the last item in the Sequence when this Policy was applied.
     policy: LSeq<(P, Option<Identifier<A>>), A>,
-    // /// Signer and verifier of sigs
+    // /// Signatory and verifier of sigs
     #[serde(skip_serializing)]
-    signer: &Fn([u8]) -> Signature,
+    signatory: Signatory,
 }
+
+type Signatory =  &Fn([u8]) -> Signature;
 
 // trait NewTrait: std::ops::Fn<([u8],)> + std::marker::Sized {}
 
@@ -150,7 +151,33 @@ where
     P: Perm + Hash + Clone + Serialize,
 {
     fn cmp(&self, other: &SequenceCrdt<A, P>) -> Ordering {
-        self.address.cmp(&other.address)
+        let result = self.actor.cmp(&other.actor) ;
+        match &result {
+            Equal => {
+                // result = 
+                self.address.cmp(&other.address)
+                // match &result {
+                //     Equal => {
+                //         result = self.policy.cmp(&other.policy);
+                //         match &result {
+                //             Equal => {
+                //                 self.data.cmp(&other.data)
+                                
+                //             },
+                //             _ => {
+                //                 result
+                //             }
+                //         }
+                //     },
+                //     _ => {
+                //         result
+                //     }
+                // }
+            },
+            _ => {
+                result
+            }
+        }
     }
 }
 
@@ -158,7 +185,6 @@ impl<A, P> Display for SequenceCrdt<A, P>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
-    // S: Fn([u8] + Sized) -> Signature,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "[")?;
@@ -178,16 +204,15 @@ impl<A, P> SequenceCrdt<A, P>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
-    // S: Fn([u8] + Sized) -> Signature,
 {
     /// Constructs a new 'SequenceCrdt'.
-    pub fn new(actor: A, address: Address, signer: S) -> Self {
+    pub fn new(actor: A, address: Address, signatory: Signatory ) -> Self {
         Self {
             actor: actor.clone(),
             address,
             data: BTreeMap::default(),
             policy: LSeq::new_with_args(actor, LSEQ_TREE_BASE, LSEQ_BOUNDARY),
-            signer,
+            signatory,
         }
     }
 
@@ -236,7 +261,7 @@ where
                     let crdt_op = lseq.append(entry);
                     let bytes_op =
                         serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
-                    let signature = Signature::Ed25519(self.signer.sign(&bytes_op));
+                    let signature = Signature::Ed25519(self.signatory(&bytes_op));
 
                     // We return the operation as it may need to be broadcasted to other replicas
                     Ok(CrdtDataOperation {
@@ -341,7 +366,7 @@ where
         let ctx = prev_policy_id.map(|policy_id| (policy_id, cur_last_item));
 
         let bytes_op = serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
-        let signature = Signature::Ed25519(self.signer.sign(&bytes_op));
+        let signature = Signature::Ed25519(self.signatory(&bytes_op));
         // We return the operation as it may need to be broadcasted to other replicas
         Ok(CrdtPolicyOperation {
             address: *self.address(),
