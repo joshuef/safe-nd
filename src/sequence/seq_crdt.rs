@@ -83,7 +83,8 @@ where
     /// and the last item in the Sequence when this Policy was applied.
     policy: LSeq<(P, Option<Identifier<A>>), A>,
     /// Signer and verifier of sigs
-    signatory: S,
+    #[serde(skip_serializing)]
+    signer: S,
 }
 
 impl<A, P, S> Display for SequenceCrdt<A, P, S>
@@ -113,13 +114,13 @@ where
     S: Signer<EdSignature> + Verifier<EdSignature>,
 {
     /// Constructs a new 'SequenceCrdt'.
-    pub fn new(actor: A, address: Address, signatory: S) -> Self {
+    pub fn new(actor: A, address: Address, signer: S) -> Self {
         Self {
             actor: actor.clone(),
             address,
             data: BTreeMap::default(),
             policy: LSeq::new_with_args(actor, LSEQ_TREE_BASE, LSEQ_BOUNDARY),
-            signatory,
+            signer,
         }
     }
 
@@ -168,7 +169,7 @@ where
                     let crdt_op = lseq.append(entry);
                     let bytes_op =
                         serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
-                    let signature = Signature::Ed25519(self.signatory.sign(&bytes_op));
+                    let signature = Signature::Ed25519(self.signer.sign(&bytes_op));
 
                     // We return the operation as it may need to be broadcasted to other replicas
                     Ok(CrdtDataOperation {
@@ -273,7 +274,7 @@ where
         let ctx = prev_policy_id.map(|policy_id| (policy_id, cur_last_item));
 
         let bytes_op = serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
-        let signature = Signature::Ed25519(self.signatory.sign(&bytes_op));
+        let signature = Signature::Ed25519(self.signer.sign(&bytes_op));
         // We return the operation as it may need to be broadcasted to other replicas
         Ok(CrdtPolicyOperation {
             address: *self.address(),
