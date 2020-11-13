@@ -85,11 +85,22 @@ where
     /// and the last item in the Sequence when this Policy was applied.
     policy: LSeq<(P, Option<Identifier<A>>), A>,
     // /// Signatory and verifier of sigs
+    // #[serde(skip_deserializing)]
     #[serde(skip_serializing)]
-    signatory: Signatory,
+    #[serde(skip_deserializing)]
+    signatory: Option<Signatory>,
 }
 
-type Signatory =  &Fn([u8]) -> Signature;
+// #[derive(Default)]
+pub type Signatory =  &'static dyn Fn(&[u8]) -> Result<Signature>;
+
+// impl Default for Signatory {
+//     fn default() -> Self {
+//         |_| {
+//             Err("No sign function provided")
+//         }
+//     }
+// }
 
 // trait NewTrait: std::ops::Fn<([u8],)> + std::marker::Sized {}
 
@@ -110,7 +121,7 @@ where
         self.actor == other.actor
             && self.address == other.address
             && self.data == other.data
-            && self.policy == other.policy
+            // && self.policy == other.policy
     }
 }
 
@@ -212,7 +223,7 @@ where
             address,
             data: BTreeMap::default(),
             policy: LSeq::new_with_args(actor, LSEQ_TREE_BASE, LSEQ_BOUNDARY),
-            signatory,
+            signatory: Some(signatory),
         }
     }
 
@@ -261,7 +272,8 @@ where
                     let crdt_op = lseq.append(entry);
                     let bytes_op =
                         serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
-                    let signature = Signature::Ed25519(self.signatory(&bytes_op));
+                    let sign_fn = self.signatory.ok_or_else(|| "No sign function provided")?;
+                    let signature = sign_fn(&bytes_op)?;
 
                     // We return the operation as it may need to be broadcasted to other replicas
                     Ok(CrdtDataOperation {
@@ -366,7 +378,8 @@ where
         let ctx = prev_policy_id.map(|policy_id| (policy_id, cur_last_item));
 
         let bytes_op = serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
-        let signature = Signature::Ed25519(self.signatory(&bytes_op));
+        let sign_fn = self.signatory.ok_or_else(|| "No sign function provided")?;
+        let signature = sign_fn(&bytes_op)?;
         // We return the operation as it may need to be broadcasted to other replicas
         Ok(CrdtPolicyOperation {
             address: *self.address(),

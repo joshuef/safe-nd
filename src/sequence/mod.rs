@@ -16,7 +16,7 @@ pub use metadata::{
     Action, Address, Entries, Entry, Index, Kind, Perm, Permissions, Policy, PrivatePermissions,
     PrivatePolicy, PublicPermissions, PublicPolicy, User,
 };
-use seq_crdt::{CrdtDataOperation, CrdtPolicyOperation, Op, SequenceCrdt};
+use seq_crdt::{CrdtDataOperation, CrdtPolicyOperation, Op, SequenceCrdt, Signatory};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -37,12 +37,12 @@ pub type PolicyWriteOp<T> = CrdtPolicyOperation<ActorType, T>;
 // TODO This should be abstracted to something more general... anything that
 // can produce sn_data_type Signatures
 /// Signatory and validator of sigs.
-pub type Signatory = ed25519_dalek::Keypair;
+// pub type Signatory = ed25519_dalek::Keypair;
 
 /// Public Sequence.
-pub type PublicSeqData = SequenceCrdt<ActorType, PublicPolicy, Signatory>;
+pub type PublicSeqData = SequenceCrdt<ActorType, PublicPolicy>;
 /// Private Sequence.
-pub type PrivateSeqData = SequenceCrdt<ActorType, PrivatePolicy, Signatory>;
+pub type PrivateSeqData = SequenceCrdt<ActorType, PrivatePolicy>;
 
 impl Debug for PublicSeqData {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
