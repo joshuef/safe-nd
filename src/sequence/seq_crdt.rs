@@ -197,7 +197,7 @@ where
             address,
             data: BTreeMap::default(),
             policy: LSeq::new_with_args(actor, LSEQ_TREE_BASE, LSEQ_BOUNDARY),
-            signatory: Some(signatory),
+            signatory: Some(Arc::new(signatory)),
         }
     }
 
@@ -246,7 +246,7 @@ where
                     let crdt_op = lseq.append(entry);
                     let bytes_op =
                         serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
-                    let sign_fn = self.signatory.ok_or_else(|| "No sign function provided")?;
+                    let sign_fn = self.signatory.as_ref().ok_or_else(|| "No sign function provided")?;
                     let signature = sign_fn(&bytes_op)?;
 
                     // We return the operation as it may need to be broadcasted to other replicas
@@ -352,7 +352,7 @@ where
         let ctx = prev_policy_id.map(|policy_id| (policy_id, cur_last_item));
 
         let bytes_op = serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
-        let sign_fn = self.signatory.ok_or_else(|| "No sign function provided")?;
+        let sign_fn = self.signatory.as_ref().ok_or_else(|| "No sign function provided")?;
         let signature = sign_fn(&bytes_op)?;
         // We return the operation as it may need to be broadcasted to other replicas
         Ok(CrdtPolicyOperation {
