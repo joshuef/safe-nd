@@ -85,10 +85,10 @@ where
     /// Sign function
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    signatory: Option<Signatory>,
+    signatory: Option<Arc<Signatory>>,
 }
 
-pub type Signatory = &'static dyn Fn(&[u8]) -> Result<Signature>;
+pub type Signatory = Box< dyn Fn(&[u8]) -> Result<Signature> >;
 
 impl<A, P> PartialEq for SequenceCrdt<A, P>
 where
