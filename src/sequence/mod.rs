@@ -10,13 +10,15 @@
 mod metadata;
 mod seq_crdt;
 
-use crate::{Error, PublicKey, Result};
+use crate::{Error, PublicKey, Result, Signature};
 use crdts::lseq::ident::Identifier;
 pub use metadata::{
     Action, Address, Entries, Entry, Index, Kind, Perm, Permissions, Policy, PrivatePermissions,
     PrivatePolicy, PublicPermissions, PublicPolicy, User,
 };
-use seq_crdt::{CrdtDataOperation, CrdtPolicyOperation, Op, SequenceCrdt, Signatory};
+use seq_crdt::{CrdtDataOperation, CrdtPolicyOperation, Op, SequenceCrdt, 
+    /*Signatory*/
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -40,9 +42,9 @@ pub type PolicyWriteOp<T> = CrdtPolicyOperation<ActorType, T>;
 // pub type Signatory = ed25519_dalek::Keypair;
 
 /// Public Sequence.
-pub type PublicSeqData = SequenceCrdt<ActorType, PublicPolicy>;
+pub type PublicSeqData = SequenceCrdt<ActorType, PublicPolicy, Box<Fn(&[u8]) -> Result<Signature>>>;
 /// Private Sequence.
-pub type PrivateSeqData = SequenceCrdt<ActorType, PrivatePolicy>;
+pub type PrivateSeqData = SequenceCrdt<ActorType, PrivatePolicy, Box<Fn(&[u8]) -> Result<Signature>>>;
 
 impl Debug for PublicSeqData {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {

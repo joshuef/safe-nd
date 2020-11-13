@@ -66,11 +66,11 @@ pub struct CrdtPolicyOperation<A: Actor + Display + std::fmt::Debug + Serialize,
 
 /// Sequence data type as a CRDT with Access Control
 #[derive(Clone, Serialize, Deserialize)]
-pub struct SequenceCrdt<A, P, Sig>
+pub struct SequenceCrdt<A, P, S>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
-    // Sig: Fn(&[u8]) -> Result<Signature>
+    S: Fn(&[u8]) -> Result<Signature>
 {
     /// Actor of this piece of data
     pub(crate) actor: A,
@@ -86,16 +86,19 @@ where
     /// Sign function
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    signatory: Sig,
+    signatory: Option<Arc<S>>,
     // signatory: Option<Signatory>,
 }
 
-pub type Signatory = Arc<Box< dyn Fn(&[u8]) -> Result<Signature> >>;
+// pub type Signatory = Option<Arc<dyn Fn(&[u8]) -> Result<Signature>>>;
+// pub type Signatory = Arc<Box< dyn Fn(&[u8]) -> Result<Signature> >>;
 
-impl<A, P> PartialEq for SequenceCrdt<A, P>
+impl<A, P, S> PartialEq for SequenceCrdt<A, P, S>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
+    S: Fn(&[u8]) -> Result<Signature>
+
 {
     fn eq(&self, other: &Self) -> bool {
         self.actor == other.actor && self.address == other.address && self.data == other.data
@@ -103,10 +106,12 @@ where
     }
 }
 
-impl<A, P> Hash for SequenceCrdt<A, P>
+impl<A, P, S> Hash for SequenceCrdt<A, P, S>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
+    S: Fn(&[u8]) -> Result<Signature>
+
 {
     fn hash<H: Hasher>(&self, into: &mut H) {
         self.actor.hash(into);
@@ -117,29 +122,35 @@ where
     }
 }
 
-impl<A, P> Eq for SequenceCrdt<A, P>
+impl<A, P, S> Eq for SequenceCrdt<A, P, S>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
+    S: Fn(&[u8]) -> Result<Signature>
+
 {
 }
 
-impl<A, P> PartialOrd for SequenceCrdt<A, P>
+impl<A, P, S> PartialOrd for SequenceCrdt<A, P, S>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
+    S: Fn(&[u8]) -> Result<Signature>
+
 {
-    fn partial_cmp(&self, other: &SequenceCrdt<A, P>) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &SequenceCrdt<A, P, S>) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<A, P> Ord for SequenceCrdt<A, P>
+impl<A, P, S> Ord for SequenceCrdt<A, P, S>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
+    S: Fn(&[u8]) -> Result<Signature>
+
 {
-    fn cmp(&self, other: &SequenceCrdt<A, P>) -> Ordering {
+    fn cmp(&self, other: &SequenceCrdt<A, P, S>) -> Ordering {
         let result = self.actor.cmp(&other.actor);
         match &result {
             Equal => {
@@ -168,10 +179,12 @@ where
     }
 }
 
-impl<A, P> Display for SequenceCrdt<A, P>
+impl<A, P, S> Display for SequenceCrdt<A, P, S>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
+    S: Fn(&[u8]) -> Result<Signature>
+
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "[")?;
@@ -187,19 +200,22 @@ where
     }
 }
 
-impl<A, P> SequenceCrdt<A, P>
+impl<A, P, S> SequenceCrdt<A, P, S>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
+    S: Fn(&[u8]) -> Result<Signature>
+
 {
     /// Constructs a new 'SequenceCrdt'.
-    pub fn new(actor: A, address: Address, signatory: Signatory) -> Self {
+    pub fn new(actor: A, address: Address, signatory: S) -> Self {
         Self {
             actor: actor.clone(),
             address,
             data: BTreeMap::default(),
             policy: LSeq::new_with_args(actor, LSEQ_TREE_BASE, LSEQ_BOUNDARY),
-            signatory: Some(signatory),
+            signatory: Some( Arc::new(signatory) ), 
+            // signatory: Some(signatory),
         }
     }
 
@@ -248,7 +264,8 @@ where
                     let crdt_op = lseq.append(entry);
                     let bytes_op =
                         serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
-                    let sign_fn = self.signatory.as_ref().ok_or_else(|| "No sign function provided")?;
+                        let sign_fn = self.signatory.ok_or_else(||"ups")?;
+
                     let signature = sign_fn(&bytes_op)?;
 
                     // We return the operation as it may need to be broadcasted to other replicas
@@ -354,7 +371,7 @@ where
         let ctx = prev_policy_id.map(|policy_id| (policy_id, cur_last_item));
 
         let bytes_op = serialize(&crdt_op).map_err(|_| "Error serializing CRDT op".to_string())?;
-        let sign_fn = self.signatory.as_ref().ok_or_else(|| "No sign function provided")?;
+        let sign_fn = self.signatory.ok_or_else(||"ups")?;
         let signature = sign_fn(&bytes_op)?;
         // We return the operation as it may need to be broadcasted to other replicas
         Ok(CrdtPolicyOperation {
