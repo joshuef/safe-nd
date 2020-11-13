@@ -439,10 +439,13 @@ mod tests {
 
     #[test]
     fn sequence_create_public() {
-        let actor = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1 = actor1_keypair.public_key();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let sequence = Sequence::new_public(actor, actor, sequence_name, sequence_tag);
+        let sequence = Sequence::new_public(actor1, actor1, sequence_name, sequence_tag, &actor1_sign_fn);
         assert_eq!(sequence.kind(), SequenceKind::Public);
         assert_eq!(*sequence.name(), sequence_name);
         assert_eq!(sequence.tag(), sequence_tag);
@@ -456,10 +459,14 @@ mod tests {
 
     #[test]
     fn sequence_create_private() {
-        let actor = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor = actor1_keypair.public_key();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let sequence = Sequence::new_private(actor, actor, sequence_name, sequence_tag);
+
+        let sequence = Sequence::new_private(actor, actor, sequence_name, sequence_tag, &actor1_sign_fn);
         assert_eq!(sequence.kind(), SequenceKind::Private);
         assert_eq!(*sequence.name(), sequence_name);
         assert_eq!(sequence.tag(), sequence_tag);
@@ -473,11 +480,14 @@ mod tests {
 
     #[test]
     fn sequence_append_entry_and_apply() -> Result<()> {
-        let actor = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor = actor1_keypair.public_key();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let mut replica1 = Sequence::new_public(actor, actor, sequence_name, sequence_tag);
-        let mut replica2 = Sequence::new_public(actor, actor, sequence_name, sequence_tag);
+        let mut replica1 = Sequence::new_public(actor, actor, sequence_name, sequence_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_public(actor, actor, sequence_name, sequence_tag, &actor1_sign_fn);
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = SequencePublicPermissions::new(true, false);
@@ -517,11 +527,14 @@ mod tests {
 
     #[test]
     fn sequence_public_set_policy_and_apply() -> Result<()> {
-        let actor = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1 = actor1_keypair.public_key();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let mut replica1 = Sequence::new_public(actor, actor, sequence_name, sequence_tag);
-        let mut replica2 = Sequence::new_public(actor, actor, sequence_name, sequence_tag);
+        let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sequence_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_public(actor1, actor1, sequence_name, sequence_tag, &actor1_sign_fn);
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = SequencePublicPermissions::new(true, false);
@@ -529,10 +542,10 @@ mod tests {
 
         let mut perms2 = BTreeMap::default();
         let user_perms2 = SequencePublicPermissions::new(false, true);
-        let _ = perms2.insert(SequenceUser::Key(actor), user_perms2);
+        let _ = perms2.insert(SequenceUser::Key(actor1), user_perms2);
 
-        let op1 = replica1.set_public_policy(actor, perms1.clone())?;
-        let op2 = replica1.set_public_policy(actor, perms2.clone())?;
+        let op1 = replica1.set_public_policy(actor1, perms1.clone())?;
+        let op2 = replica1.set_public_policy(actor1, perms2.clone())?;
 
         // if we apply the operations in different order it should fail
         // as op2 is not causally ready in replica2, it depends on op1
@@ -548,7 +561,7 @@ mod tests {
         let index_0 = SequenceIndex::FromStart(0);
         let first_entry = replica1.public_policy_at(index_0)?;
         assert_eq!(first_entry.permissions, perms1);
-        assert_eq!(first_entry.owner, actor);
+        assert_eq!(first_entry.owner, actor1);
         assert_eq!(first_entry, replica2.public_policy_at(index_0)?);
         assert_eq!(
             SequencePermissions::Public(user_perms1),
@@ -558,11 +571,11 @@ mod tests {
         let index_1 = SequenceIndex::FromStart(1);
         let second_entry = replica1.public_policy_at(index_1)?;
         assert_eq!(second_entry.permissions, perms2);
-        assert_eq!(second_entry.owner, actor);
+        assert_eq!(second_entry.owner, actor1);
         assert_eq!(second_entry, replica2.public_policy_at(index_1)?);
         assert_eq!(
             SequencePermissions::Public(user_perms2),
-            replica1.permissions_at(SequenceUser::Key(actor), index_1, None)?
+            replica1.permissions_at(SequenceUser::Key(actor1), index_1, None)?
         );
 
         Ok(())
@@ -570,12 +583,17 @@ mod tests {
 
     #[test]
     fn sequence_private_set_policy_and_apply() -> Result<()> {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
+        let actor2_sign_fn = |data: &[u8]| Ok(actor2_keypair.sign(data));
+
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag);
-        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag);
+        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag, &actor2_sign_fn);
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = SequencePrivatePermissions::new(true, false, true);
@@ -624,12 +642,17 @@ mod tests {
 
     #[test]
     fn sequence_public_set_policy_and_append_fails_when_no_perms_for_actor() -> Result<()> {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
+        let actor2_sign_fn = |data: &[u8]| Ok(actor2_keypair.sign(data));
+
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sequence_tag);
-        let mut replica2 = Sequence::new_public(actor2, actor2, sequence_name, sequence_tag);
+        let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sequence_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_public(actor2, actor2, sequence_name, sequence_tag, &actor2_sign_fn);
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = SequencePublicPermissions::new(true, false);
@@ -664,12 +687,15 @@ mod tests {
 
     #[test]
     fn sequence_public_set_policy_and_append_succeeds_when_perms_updated_for_actor() -> Result<()> {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sequence_tag);
-        let mut replica2 = Sequence::new_public(actor2, actor2, sequence_name, sequence_tag);
+        let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sequence_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_public(actor2, actor2, sequence_name, sequence_tag, &actor1_sign_fn);
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = SequencePublicPermissions::new(true, false);
@@ -716,12 +742,18 @@ mod tests {
 
     #[test]
     fn sequence_private_set_policy_and_append_fails_when_no_perms_for_actor() -> Result<()> {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
+        let actor2_sign_fn = |data: &[u8]| Ok(actor2_keypair.sign(data));
+
+
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag);
-        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag);
+        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag, &actor2_sign_fn);
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = SequencePrivatePermissions::new(true, false, true);
@@ -755,12 +787,17 @@ mod tests {
 
     #[test]
     fn sequence_private_set_policy_and_get_read_fails_when_no_perms_for_actor() -> Result<()> {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
+        let actor2_sign_fn = |data: &[u8]| Ok(actor2_keypair.sign(data));
+
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag);
-        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag);
+        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag, &actor2_sign_fn);
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = SequencePrivatePermissions::new(true, false, true);
@@ -802,12 +839,18 @@ mod tests {
     #[test]
     fn sequence_private_set_policy_and_last_entry_read_fails_when_no_perms_for_actor() -> Result<()>
     {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag);
-        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag);
+        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag, &actor1_sign_fn);
+        
+            let actor2_sign_fn = |data: &[u8]| Ok(actor2_keypair.sign(data));
+        
+        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag, &actor2_sign_fn);
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = SequencePrivatePermissions::new(true, false, true);
@@ -846,12 +889,18 @@ mod tests {
 
     #[test]
     fn sequence_private_set_policy_and_range_read_fails_when_no_perms_for_actor() -> Result<()> {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag);
-        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag);
+        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag, &actor1_sign_fn);
+        
+            let actor2_sign_fn = |data: &[u8]| Ok(actor2_keypair.sign(data));
+        
+        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag, &actor2_sign_fn);
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = SequencePrivatePermissions::new(true, false, true);
@@ -902,12 +951,18 @@ mod tests {
 
     #[test]
     fn sequence_private_set_policy_and_read_possible_after_update() -> Result<()> {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
         let sequence_name = XorName::random();
         let sequence_tag = 43_000;
-        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag);
-        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag);
+        let mut replica1 = Sequence::new_private(actor1, actor1, sequence_name, sequence_tag, &actor1_sign_fn);
+        
+            let actor2_sign_fn = |data: &[u8]| Ok(actor2_keypair.sign(data));
+        
+        let mut replica2 = Sequence::new_private(actor2, actor2, sequence_name, sequence_tag, &actor2_sign_fn);
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = SequencePrivatePermissions::new(true, false, true);
@@ -971,14 +1026,17 @@ mod tests {
 
     #[test]
     fn sequence_concurrent_policy_and_data_ops() -> Result<()> {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
         let sdata_name: XorName = rand::random();
         let sdata_tag = 43_000u64;
 
         // Instantiate the same Sequence on two replicas with two diff actors
-        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag);
-        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag);
+        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag, &actor1_sign_fn);
 
         // Set Actor1 as the owner in both replicas and
         // grant authorisation for Append to Actor2 in both replicas
@@ -1030,16 +1088,19 @@ mod tests {
 
     #[test]
     fn sequence_causality_between_data_and_policy_ops() -> Result<()> {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
-        let actor3 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
+        let actor3 = generate_keypair().public_key();
         let sdata_name: XorName = rand::random();
         let sdata_tag = 43_001u64;
 
         // Instantiate the same Sequence on three replicas with three diff actors
-        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag);
-        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag);
-        let mut replica3 = Sequence::new_public(actor3, actor3, sdata_name, sdata_tag);
+        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag, &actor1_sign_fn);
+        let mut replica3 = Sequence::new_public(actor3, actor3, sdata_name, sdata_tag, &actor1_sign_fn);
 
         // Set Actor1 as the owner in all replicas, with Append perms for Actor3
         let mut perms = BTreeMap::default();
@@ -1095,14 +1156,17 @@ mod tests {
 
     #[test]
     fn sequence_concurrent_policy_ops() -> Result<()> {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
         let sdata_name: XorName = rand::random();
         let sdata_tag = 43_001u64;
 
         // Instantiate the same Sequence on two replicas with two diff actors
-        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag);
-        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag);
+        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag, &actor1_sign_fn);
 
         // Set Actor1 as the owner and Actor2 with Append and Admin perms in all replicas
         let mut perms = BTreeMap::default();
@@ -1126,8 +1190,8 @@ mod tests {
         // Concurrently set new policy (new random owner) with Append and Admin perms
         // for both actors on both replicas
         let _ = perms.insert(SequenceUser::Key(actor1), user_perms);
-        let owner_op_1 = replica1.set_public_policy(generate_public_key(), perms.clone())?;
-        let owner_op_2 = replica2.set_public_policy(generate_public_key(), perms)?;
+        let owner_op_1 = replica1.set_public_policy(generate_keypair().public_key(), perms.clone())?;
+        let owner_op_2 = replica2.set_public_policy(generate_keypair().public_key(), perms)?;
         // ...and concurrently append a new item on top of their own respective new policies
         let item1_r1 = b"item1_replica1".to_vec();
         let item1_r2 = b"item1_replica2".to_vec();
@@ -1158,14 +1222,17 @@ mod tests {
 
     #[test]
     fn sequence_old_data_op() -> Result<()> {
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
         let sdata_name: XorName = rand::random();
         let sdata_tag = 43_001u64;
 
         // Instantiate the same Sequence on two replicas with two diff actors
-        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag);
-        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag);
+        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag, &actor1_sign_fn);
 
         // Set Actor1 as the owner and Actor2 with append perms in all replicas
         let mut perms = BTreeMap::default();
@@ -1203,14 +1270,17 @@ mod tests {
         // which was generated before applying the policy2 op, thus it can still be applied
         // but as an old policy between policy1 and policy2 in the policies history.
 
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
         let sdata_name: XorName = rand::random();
         let sdata_tag = 43_001u64;
 
         // Instantiate the same Sequence on two replicas with two diff actors
-        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag);
-        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag);
+        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag, &actor1_sign_fn);
 
         // Set Actor1 as the owner in both replicas (policy1)
         let mut perms = BTreeMap::default();
@@ -1222,7 +1292,7 @@ mod tests {
 
         // Let's create a second policy op on replica1, but don't apply it to replica2 yet
         let perms = BTreeMap::default();
-        let actor3 = generate_public_key();
+        let actor3 = generate_keypair().public_key();
         let old_owner_op = replica1.set_public_policy(actor3, perms.clone())?;
 
         // Set Actor2 as the new owner in replica2 (policy2)
@@ -1275,14 +1345,17 @@ mod tests {
         // Note: this is currently a known issue, once an entity was given
         // Admin permissions it can always send policy changes on top of any policy.
 
-        let actor1 = generate_public_key();
-        let actor2 = generate_public_key();
+        let actor1_keypair = generate_keypair();
+        let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+        let actor1 = actor1_keypair.public_key();
+        let actor2_keypair = generate_keypair();
+        let actor2 = actor2_keypair.public_key();
         let sdata_name: XorName = rand::random();
         let sdata_tag = 43_001u64;
 
         // Instantiate the same Sequence on two replicas with two diff actors
-        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag);
-        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag);
+        let mut replica1 = Sequence::new_public(actor1, actor1, sdata_name, sdata_tag, &actor1_sign_fn);
+        let mut replica2 = Sequence::new_public(actor2, actor2, sdata_name, sdata_tag, &actor1_sign_fn);
 
         // Set Actor1 as the owner in both replicas (policy1)
         let perms = BTreeMap::default();
@@ -1343,9 +1416,8 @@ mod tests {
 
     // Helpers for tests
 
-    fn generate_public_key() -> PublicKey {
-        let keypair = Keypair::new_ed25519(&mut OsRng);
-        keypair.public_key()
+    fn generate_keypair() -> Keypair {
+        Keypair::new_ed25519(&mut OsRng)
     }
 
     // check it fails due to not being causally ready
@@ -1403,13 +1475,17 @@ mod tests {
     fn generate_replicas(max_quantity: usize) -> impl Strategy<Value = (Vec<Sequence>, PublicKey)> {
         let xorname = XorName::random();
         let tag = 45_000u64;
-        let owner = generate_public_key();
+        let keypair = generate_keypair();
+        let owner = keypair.public_key();
 
         (1..max_quantity + 1).prop_map(move |quantity| {
             let mut replicas = Vec::with_capacity(quantity);
             for _ in 0..quantity {
-                let actor = generate_public_key();
-                let replica = Sequence::new_public(owner, actor, xorname, tag);
+                let actor1_keypair = generate_keypair();
+                let actor1 = actor1_keypair.public_key();
+                let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+
+                let replica = Sequence::new_public(owner, actor1, xorname, tag, &actor1_sign_fn);
                 replicas.push(replica);
             }
 
@@ -1452,14 +1528,16 @@ mod tests {
         fn proptest_seq_doesnt_crash_with_random_data(
             s in generate_seq_entry()
         ) {
-            let actor1 = generate_public_key();
+            let actor1_keypair = generate_keypair();
+            let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+            let actor1 = actor1_keypair.public_key();
             let sequence_name = XorName::random();
 
             let sdata_tag = 43_001u64;
 
             // Instantiate the same Sequence on two replicas
-            let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag);
-            let mut replica2 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag);
+            let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag, &actor1_sign_fn);
+            let mut replica2 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag, &actor1_sign_fn);
 
             // Set Actor1 as the owner
             let perms = BTreeMap::default();
@@ -1479,14 +1557,16 @@ mod tests {
             dataset in generate_dataset(1000)
         ) {
 
-            let actor1 = generate_public_key();
+            let actor1_keypair = generate_keypair();
+            let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+            let actor1 = actor1_keypair.public_key();
             let sequence_name = XorName::random();
 
             let sdata_tag = 43_001u64;
 
             // Instantiate the same Sequence on two replicas
-            let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag);
-            let mut replica2 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag);
+            let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag, &actor1_sign_fn);
+            let mut replica2 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag, &actor1_sign_fn);
 
             // Set Actor1 as the owner
             let perms = BTreeMap::default();
@@ -1604,15 +1684,18 @@ mod tests {
             dataset in generate_dataset_and_probability(1000),
         ) {
 
-            let actor1 = generate_public_key();
-            let actor2 = generate_public_key();
+            let actor1_keypair = generate_keypair();
+            let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+            let actor1 = actor1_keypair.public_key();
+            let actor2_keypair = generate_keypair();
+            let actor2 = actor2_keypair.public_key();
             let sequence_name = XorName::random();
 
             let sdata_tag = 43_001u64;
 
             // Instantiate the same Sequence on two replicas
-            let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag);
-            let mut replica2 = Sequence::new_public(actor2, actor2, sequence_name, sdata_tag);
+            let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag, &actor1_sign_fn);
+            let mut replica2 = Sequence::new_public(actor2, actor2, sequence_name, sdata_tag, &actor1_sign_fn);
 
             // Set Actor1 as the owner
             let perms = BTreeMap::default();
@@ -1627,7 +1710,7 @@ mod tests {
                     ops.push(OpType::Data(op));
 
                     if policy_change_chance < u8::MAX / 3 {
-                        let new_owner = generate_public_key();
+                        let new_owner = generate_keypair().public_key();
 
                         let mut perms = BTreeMap::default();
                         let user_perms =
@@ -1688,15 +1771,20 @@ mod tests {
             dataset in prop::collection::vec((generate_seq_entry(), any::<u8>()), 100..1000)
         ) {
 
-            let actor1 = generate_public_key();
-            let actor2 = generate_public_key();
+            let actor1_keypair = generate_keypair();
+            let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+            let actor1 = actor1_keypair.public_key();
+            let actor2_keypair = generate_keypair();
+            let actor2_sign_fn = |data: &[u8]| Ok(actor2_keypair.sign(data));
+
+            let actor2 = actor2_keypair.public_key();
             let sequence_name = XorName::random();
 
             let sdata_tag = 43_001u64;
 
             // Instantiate the same Sequence on two replicas
-            let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag);
-            let mut replica2 = Sequence::new_public(actor2, actor2, sequence_name, sdata_tag);
+            let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag, &actor1_sign_fn);
+            let mut replica2 = Sequence::new_public(actor2, actor2, sequence_name, sdata_tag, &actor2_sign_fn);
 
             // Set Actor1 as the owner
             let perms = BTreeMap::default();
@@ -1709,7 +1797,7 @@ mod tests {
             for (data, policy_change_chance) in dataset {
                     let op = replica1.append(data)?;
                     ops.push(OpType::Data(op));
-                    let new_owner = generate_public_key();
+                    let new_owner = generate_keypair().public_key();
 
                     if policy_change_chance < u8::MAX / 8 {
                         let mut perms = BTreeMap::default();
@@ -1791,15 +1879,20 @@ mod tests {
             dataset in generate_dataset_and_probability(1000),
         ) {
 
-            let actor1 = generate_public_key();
-            let actor2 = generate_public_key();
+            let actor1_keypair = generate_keypair();
+            let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+            let actor1 = actor1_keypair.public_key();
+            let actor2_keypair = generate_keypair();
+            let actor2 = actor2_keypair.public_key();
+            let actor2_sign_fn = |data: &[u8]| Ok(actor2_keypair.sign(data));
+
             let sequence_name = XorName::random();
 
             let sdata_tag = 43_001u64;
 
             // Instantiate the same Sequence on two replicas
-            let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag);
-            let mut replica2 = Sequence::new_public(actor2, actor2, sequence_name, sdata_tag);
+            let mut replica1 = Sequence::new_public(actor1, actor1, sequence_name, sdata_tag, &actor1_sign_fn);
+            let mut replica2 = Sequence::new_public(actor2, actor2, sequence_name, sdata_tag, &actor2_sign_fn);
 
             // Set Actor1 as the owner
             let perms = BTreeMap::default();
@@ -1891,9 +1984,13 @@ mod tests {
             // set up a replica that has nothing to do with the rest, random xor... different owner...
             let xorname = XorName::random();
             let tag = 45_000u64;
-            let owner = generate_public_key();
-            let actor = generate_public_key();
-            let mut bogus_replica = Sequence::new_public(owner, actor, xorname, tag);
+            let keypair= generate_keypair();
+            let owner = keypair.public_key();
+            let actor1_keypair = generate_keypair();
+            let actor = actor1_keypair.public_key();
+            let actor1_sign_fn = |data: &[u8]| Ok(actor1_keypair.sign(data));
+
+            let mut bogus_replica = Sequence::new_public(owner, actor, xorname, tag, &actor1_sign_fn);
             let perms = BTreeMap::default();
             let _ = bogus_replica.set_public_policy(owner, perms).unwrap();
 

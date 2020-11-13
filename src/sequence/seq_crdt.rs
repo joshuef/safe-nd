@@ -70,8 +70,6 @@ pub struct SequenceCrdt<A, P>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
-    // T: EdSignature,
-    // S: Fn([u8]) -> Signature,
 {
     /// Actor of this piece of data
     pub(crate) actor: A,
@@ -84,33 +82,13 @@ where
     /// History of the Policy matrix, each entry representing a version of the Policy matrix
     /// and the last item in the Sequence when this Policy was applied.
     policy: LSeq<(P, Option<Identifier<A>>), A>,
-    // /// Signatory and verifier of sigs
-    // #[serde(skip_deserializing)]
+    /// Sign function
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     signatory: Option<Signatory>,
 }
 
-// #[derive(Default)]
-pub type Signatory =  &'static dyn Fn(&[u8]) -> Result<Signature>;
-
-// impl Default for Signatory {
-//     fn default() -> Self {
-//         |_| {
-//             Err("No sign function provided")
-//         }
-//     }
-// }
-
-// trait NewTrait: std::ops::Fn<([u8],)> + std::marker::Sized {}
-
-// #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash, PartialOrd)]
-// pub struct Signatory {
-//     // #[serde(skip_serializing)]
-//     pub sign: dyn Fn([u8]) -> Signature
-// }
-
-// <Fn([u8]) -> Signature>;
+pub type Signatory = &'static dyn Fn(&[u8]) -> Result<Signature>;
 
 impl<A, P> PartialEq for SequenceCrdt<A, P>
 where
@@ -118,10 +96,8 @@ where
     P: Perm + Hash + Clone + Serialize,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.actor == other.actor
-            && self.address == other.address
-            && self.data == other.data
-            // && self.policy == other.policy
+        self.actor == other.actor && self.address == other.address && self.data == other.data
+        // && self.policy == other.policy
     }
 }
 
@@ -162,10 +138,10 @@ where
     P: Perm + Hash + Clone + Serialize,
 {
     fn cmp(&self, other: &SequenceCrdt<A, P>) -> Ordering {
-        let result = self.actor.cmp(&other.actor) ;
+        let result = self.actor.cmp(&other.actor);
         match &result {
             Equal => {
-                // result = 
+                // result =
                 self.address.cmp(&other.address)
                 // match &result {
                 //     Equal => {
@@ -173,7 +149,7 @@ where
                 //         match &result {
                 //             Equal => {
                 //                 self.data.cmp(&other.data)
-                                
+
                 //             },
                 //             _ => {
                 //                 result
@@ -184,10 +160,8 @@ where
                 //         result
                 //     }
                 // }
-            },
-            _ => {
-                result
             }
+            _ => result,
         }
     }
 }
@@ -217,7 +191,7 @@ where
     P: Perm + Hash + Clone + Serialize,
 {
     /// Constructs a new 'SequenceCrdt'.
-    pub fn new(actor: A, address: Address, signatory: Signatory ) -> Self {
+    pub fn new(actor: A, address: Address, signatory: Signatory) -> Self {
         Self {
             actor: actor.clone(),
             address,
