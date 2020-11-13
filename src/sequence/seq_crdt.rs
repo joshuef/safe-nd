@@ -18,11 +18,14 @@ use crdts::{
 use ed25519_dalek::Signature as EdSignature;
 use serde::{Deserialize, Serialize};
 use signature::{Signer, Verifier};
+use std::hash::Hasher;
 use std::{
+    cmp::Ordering,
     cmp::Ordering::{Equal, Greater, Less},
     collections::BTreeMap,
     fmt::{self, Display},
     hash::Hash,
+    sync::Arc,
 };
 
 /// Since in most of the cases it will be append operations, having a small
@@ -63,13 +66,13 @@ pub struct CrdtPolicyOperation<A: Actor + Display + std::fmt::Debug + Serialize,
 }
 
 /// Sequence data type as a CRDT with Access Control
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd)]
-pub struct SequenceCrdt<A, P, S>
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SequenceCrdt<A, P>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
     // T: EdSignature,
-    S: Signer<EdSignature> + Verifier<EdSignature>,
+    // S: Fn([u8]) -> Signature,
 {
     /// Actor of this piece of data
     pub(crate) actor: A,
@@ -82,16 +85,80 @@ where
     /// History of the Policy matrix, each entry representing a version of the Policy matrix
     /// and the last item in the Sequence when this Policy was applied.
     policy: LSeq<(P, Option<Identifier<A>>), A>,
-    /// Signer and verifier of sigs
+    // /// Signer and verifier of sigs
     #[serde(skip_serializing)]
-    signer: S,
+    signer: &Fn([u8]) -> Signature,
 }
 
-impl<A, P, S> Display for SequenceCrdt<A, P, S>
+// trait NewTrait: std::ops::Fn<([u8],)> + std::marker::Sized {}
+
+// #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash, PartialOrd)]
+// pub struct Signatory {
+//     // #[serde(skip_serializing)]
+//     pub sign: dyn Fn([u8]) -> Signature
+// }
+
+// <Fn([u8]) -> Signature>;
+
+impl<A, P> PartialEq for SequenceCrdt<A, P>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
-    S: Signer<EdSignature> + Verifier<EdSignature>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.actor == other.actor
+            && self.address == other.address
+            && self.data == other.data
+            && self.policy == other.policy
+    }
+}
+
+impl<A, P> Hash for SequenceCrdt<A, P>
+where
+    A: Actor + Display + std::fmt::Debug + Serialize,
+    P: Perm + Hash + Clone + Serialize,
+{
+    fn hash<H: Hasher>(&self, into: &mut H) {
+        self.actor.hash(into);
+        self.address.hash(into);
+        self.data.hash(into);
+        self.policy.hash(into);
+        // self.pre.hash(into);
+    }
+}
+
+impl<A, P> Eq for SequenceCrdt<A, P>
+where
+    A: Actor + Display + std::fmt::Debug + Serialize,
+    P: Perm + Hash + Clone + Serialize,
+{
+}
+
+impl<A, P> PartialOrd for SequenceCrdt<A, P>
+where
+    A: Actor + Display + std::fmt::Debug + Serialize,
+    P: Perm + Hash + Clone + Serialize,
+{
+    fn partial_cmp(&self, other: &SequenceCrdt<A, P>) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<A, P> Ord for SequenceCrdt<A, P>
+where
+    A: Actor + Display + std::fmt::Debug + Serialize,
+    P: Perm + Hash + Clone + Serialize,
+{
+    fn cmp(&self, other: &SequenceCrdt<A, P>) -> Ordering {
+        self.address.cmp(&other.address)
+    }
+}
+
+impl<A, P> Display for SequenceCrdt<A, P>
+where
+    A: Actor + Display + std::fmt::Debug + Serialize,
+    P: Perm + Hash + Clone + Serialize,
+    // S: Fn([u8] + Sized) -> Signature,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "[")?;
@@ -107,11 +174,11 @@ where
     }
 }
 
-impl<A, P, S> SequenceCrdt<A, P, S>
+impl<A, P> SequenceCrdt<A, P>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
-    S: Signer<EdSignature> + Verifier<EdSignature>,
+    // S: Fn([u8] + Sized) -> Signature,
 {
     /// Constructs a new 'SequenceCrdt'.
     pub fn new(actor: A, address: Address, signer: S) -> Self {
