@@ -66,10 +66,11 @@ pub struct CrdtPolicyOperation<A: Actor + Display + std::fmt::Debug + Serialize,
 
 /// Sequence data type as a CRDT with Access Control
 #[derive(Clone, Serialize, Deserialize)]
-pub struct SequenceCrdt<A, P>
+pub struct SequenceCrdt<A, P, Sig>
 where
     A: Actor + Display + std::fmt::Debug + Serialize,
     P: Perm + Hash + Clone + Serialize,
+    // Sig: Fn(&[u8]) -> Result<Signature>
 {
     /// Actor of this piece of data
     pub(crate) actor: A,
@@ -85,10 +86,11 @@ where
     /// Sign function
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    signatory: Option<Arc<Signatory>>,
+    signatory: Sig,
+    // signatory: Option<Signatory>,
 }
 
-pub type Signatory = Box< dyn Fn(&[u8]) -> Result<Signature> >;
+pub type Signatory = Arc<Box< dyn Fn(&[u8]) -> Result<Signature> >>;
 
 impl<A, P> PartialEq for SequenceCrdt<A, P>
 where
@@ -197,7 +199,7 @@ where
             address,
             data: BTreeMap::default(),
             policy: LSeq::new_with_args(actor, LSEQ_TREE_BASE, LSEQ_BOUNDARY),
-            signatory: Some(Arc::new(signatory)),
+            signatory: Some(signatory),
         }
     }
 
