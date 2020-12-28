@@ -10,6 +10,7 @@ repository = "https://github.com/maidsafe/safe-nd"
 version = "0.10.4"
 
 [dependencies]
+thiserror="1.0.23"
 bincode = "1.2.1"
 ed25519-dalek = "~0.9.1"
 hex_fmt = "~0.3.0"

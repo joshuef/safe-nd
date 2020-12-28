@@ -15,83 +15,100 @@ use std::{
     result,
 };
 
+use thiserror::Error;
+
 /// A specialised `Result` type for safecoin.
-pub type Result<T> = result::Result<T, Error>;
+pub type Result<T> = thiserror::Result<T>;
 
 /// Error debug struct
-pub struct ErrorDebug<'a, T>(pub &'a Result<T>);
+// pub struct ErrorDebug<'a, T>(pub &'a Result<T>);
 
-impl<'a, T> Debug for ErrorDebug<'a, T> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if let Err(error) = self.0 {
-            write!(f, "{:?}", error)
-        } else {
-            write!(f, "Success")
-        }
-    }
-}
+// impl<'a, T> Debug for ErrorDebug<'a, T> {
+//     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+//         if let Err(error) = self.0 {
+//             write!(f, "{:?}", error)
+//         } else {
+//             write!(f, "Success")
+//         }
+//     }
+// }
 
 /// Main error type for the crate.
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Error, Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Error {
-    /// Access is denied for a given requester
+    #[error("Access Denied")]
     AccessDenied,
-    /// Login packet does not exist
-    NoSuchLoginPacket,
-    /// Attempt to store a login packet at an already occupied address
-    LoginPacketExists,
-    /// Requested data not found
+    #[error("Requested data not found")]
     NoSuchData,
-    /// Attempt to create a mutable data when data with such a name already exists
+    #[error("Data provided already exists")]
     DataExists,
-    /// Requested entry not found
+    #[error("Requested entry not found")]
     NoSuchEntry,
-    /// Exceeded a limit on a number of entries
+    #[error("Exceeded a limit on a number of entries")]
     TooManyEntries,
-    /// Some entry actions are not valid.
+    #[error("Some entry actions are not valid")]
     InvalidEntryActions(BTreeMap<Vec<u8>, EntryError>),
-    /// Key does not exist
+    #[error("Key does not exist")]
     NoSuchKey,
     /// Duplicate Entries in this push
+    #[error("Duplicate entries provided")]
     DuplicateEntryKeys,
     /// The list of owner keys is invalid
+    #[error("Invalid owner keys")]
     InvalidOwners,
     /// Invalid version for performing a given mutating operation. Contains the
     /// current data version.
+    #[error("Invalid version provided: {0}")]
     InvalidSuccessor(u64),
     /// Invalid version for performing a given mutating operation. Contains the
     /// current owners version.
+    #[error("Invalid owners version provided: {0}")]
     InvalidOwnersSuccessor(u64),
     /// Invalid version for performing a given mutating operation. Contains the
     /// current permissions version.
+    #[error("Invalid permission version provided: {0}")]
     InvalidPermissionsSuccessor(u64),
     /// Invalid Operation such as a POST on ImmutableData
+    #[error("Invalid operation")]
     InvalidOperation,
     /// Mismatch between key type and signature type.
+    #[error("Sign key and signature type do not match")]
     SigningKeyTypeMismatch,
     /// Failed signature validation.
+    #[error("Invalid signature")]
     InvalidSignature,
     /// Received a request with a duplicate MessageId
+    #[error("Duplicate message id received")]
     DuplicateMessageId,
     /// Network error occurring at Vault level which has no bearing on clients, e.g. serialisation
     /// failure or database failure
+    #[error("Network error: {0}")]
     NetworkOther(String),
     /// While parsing, precision would be lost.
+    #[error("Lost precision on the number of coins during parsing")]
     LossOfPrecision,
     /// The coin amount would exceed
     /// [the maximum value for `Coins`](constant.MAX_COINS_VALUE.html).
+    #[error("Overflow on number of coins (check the MAX_COINS_VALUE const)")]
     ExcessiveValue,
     /// Failed to parse the string as [`Coins`](struct.Coins.html).
+    #[error("Failed to parse: {0}")]
     FailedToParse(String),
     /// Transaction ID already exists.
+    #[error("Transaction Id already exists")]
     TransactionIdExists,
     /// Insufficient coins.
+    #[error("Insufficient balance to complete this operation")]
     InsufficientBalance,
     /// Inexistent balance.
+    // TODO: key/wallet/balance, what's our vocab here?
+    #[error("No such key exists")]
     NoSuchBalance,
     /// Coin balance already exists.
+    #[error("Key already exists")]
     BalanceExists,
     /// Expected data size exceeded.
+    #[error("Size of the structure exceeds the limit")]
     ExceededSize,
 }
 
@@ -149,54 +166,57 @@ impl Display for Error {
             Error::NoSuchBalance => write!(f, "Balance does not exist"),
             Error::BalanceExists => write!(f, "Balance already exists"),
             Error::DuplicateMessageId => write!(f, "MessageId already exists"),
-            Error::ExceededSize => write!(f, "Size of the structure exceeds the limit"),
+            // Error::ExceededSize => write!(f, "Size of the structure exceeds the limit"),
         }
     }
 }
 
-impl error::Error for Error {
-    fn description(&self) -> &str {
-        match *self {
-            Error::AccessDenied => "Access denied",
-            Error::NoSuchLoginPacket => "Login packet does not exist",
-            Error::LoginPacketExists => "Login packet already exists at this location",
-            Error::NoSuchData => "No such data",
-            Error::DataExists => "Data exists",
-            Error::NoSuchEntry => "No such entry",
-            Error::TooManyEntries => "Too many entries",
-            Error::InvalidEntryActions(_) => "Invalid entry actions",
-            Error::NoSuchKey => "No such key",
-            Error::DuplicateEntryKeys => "Duplicate keys in this push",
-            Error::InvalidOwners => "Invalid owners",
-            Error::InvalidSuccessor(_) => "Invalid data successor",
-            Error::InvalidOwnersSuccessor(_) => "Invalid owners successor",
-            Error::InvalidPermissionsSuccessor(_) => "Invalid permissions successor",
-            Error::InvalidOperation => "Invalid operation",
-            Error::SigningKeyTypeMismatch => "Key type and signature type mismatch",
-            Error::InvalidSignature => "Invalid signature",
-            Error::NetworkOther(ref error) => error,
-            Error::LossOfPrecision => "Lost precision on the number of coins during parsing",
-            Error::ExcessiveValue => {
-                "Overflow on number of coins (check the MAX_COINS_VALUE const)"
-            }
-            Error::FailedToParse(_) => "Failed to parse entity",
-            Error::TransactionIdExists => "Transaction with a given ID already exists",
-            Error::InsufficientBalance => "Not enough coins to complete this operation",
-            Error::NoSuchBalance => "Balance does not exist",
-            Error::BalanceExists => "Balance already exists",
-            Error::DuplicateMessageId => "MessageId already exists",
-            Error::ExceededSize => "Exceeded the size limit",
-        }
-    }
-}
+// impl error::Error for Error {
+//     fn description(&self) -> &str {
+//         match *self {
+//             Error::AccessDenied => "Access denied",
+//             Error::NoSuchLoginPacket => "Login packet does not exist",
+//             Error::LoginPacketExists => "Login packet already exists at this location",
+//             Error::NoSuchData => "No such data",
+//             Error::DataExists => "Data exists",
+//             Error::NoSuchEntry => "No such entry",
+//             Error::TooManyEntries => "Too many entries",
+//             Error::InvalidEntryActions(_) => "Invalid entry actions",
+//             Error::NoSuchKey => "No such key",
+//             Error::DuplicateEntryKeys => "Duplicate keys in this push",
+//             Error::InvalidOwners => "Invalid owners",
+//             Error::InvalidSuccessor(_) => "Invalid data successor",
+//             Error::InvalidOwnersSuccessor(_) => "Invalid owners successor",
+//             Error::InvalidPermissionsSuccessor(_) => "Invalid permissions successor",
+//             Error::InvalidOperation => "Invalid operation",
+//             Error::SigningKeyTypeMismatch => "Key type and signature type mismatch",
+//             Error::InvalidSignature => "Invalid signature",
+//             Error::NetworkOther(ref error) => error,
+//             Error::LossOfPrecision => "Lost precision on the number of coins during parsing",
+//             Error::ExcessiveValue => {
+//                 "Overflow on number of coins (check the MAX_COINS_VALUE const)"
+//             }
+//             Error::FailedToParse(_) => "Failed to parse entity",
+//             Error::TransactionIdExists => "Transaction with a given ID already exists",
+//             Error::InsufficientBalance => "Not enough coins to complete this operation",
+//             Error::NoSuchBalance => "Balance does not exist",
+//             Error::BalanceExists => "Balance already exists",
+//             Error::DuplicateMessageId => "MessageId already exists",
+//             Error::ExceededSize => "Exceeded the size limit",
+//         }
+//     }
+// }
 
 /// Entry error for `Error::InvalidEntryActions`.
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Error, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum EntryError {
     /// Entry does not exists.
+    #[error("Entry does not exist")]
     NoSuchEntry,
     /// Entry already exists. Contains the current entry Key.
+    #[error("Entry already exists {0}")]
     EntryExists(u8),
     /// Invalid version when updating an entry. Contains the current entry Key.
+    #[error("Entry version for updating the entry {0}")]
     InvalidSuccessor(u8),
 }
